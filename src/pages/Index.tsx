@@ -1,13 +1,30 @@
-// Update this page (the content is just a fallback if you fail to update the page)
+import { useState, useEffect } from 'react';
+import { ApiKeyInput } from '@/components/ApiKeyInput';
+import { ChatInterface } from '@/components/ChatInterface';
+import { Toaster } from '@/components/ui/toaster';
 
 const Index = () => {
+  const [apiKey, setApiKey] = useState<string | null>(null);
+
+  useEffect(() => {
+    const stored = localStorage.getItem('openai_api_key');
+    if (stored) setApiKey(stored);
+  }, []);
+
+  if (!apiKey) {
+    return (
+      <>
+        <ApiKeyInput onApiKeySet={setApiKey} />
+        <Toaster />
+      </>
+    );
+  }
+
   return (
-    <div className="flex min-h-screen items-center justify-center bg-background">
-      <div className="text-center">
-        <h1 className="mb-4 text-4xl font-bold">Welcome to Your Blank App</h1>
-        <p className="text-xl text-muted-foreground">Start building your amazing project here!</p>
-      </div>
-    </div>
+    <>
+      <ChatInterface apiKey={apiKey} />
+      <Toaster />
+    </>
   );
 };
 

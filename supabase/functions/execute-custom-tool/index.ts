@@ -12,8 +12,9 @@ Deno.serve(async (req) => {
 
   try {
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
-    const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
-    const supabase = createClient(supabaseUrl, supabaseKey);
+    const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+    const supabaseAnonKey = Deno.env.get('SUPABASE_ANON_KEY')!;
+    const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
     // Authenticate user
     const authHeader = req.headers.get('Authorization')!;
@@ -74,9 +75,13 @@ Deno.serve(async (req) => {
     // 4. User owns and controls their own tools
     
     try {
+      console.log('Executing tool with args:', args);
+      
       // Create a sandboxed context with only Supabase client access
       const executionContext = {
-        supabase: createClient(supabaseUrl, token), // User's authenticated client
+        supabase: createClient(supabaseUrl, supabaseAnonKey, {
+          global: { headers: { Authorization: `Bearer ${token}` } }
+        }), // User's authenticated client with proper RLS
         args: args || {},
         console: console,
         JSON: JSON,

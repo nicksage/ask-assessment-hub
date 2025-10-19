@@ -53,15 +53,31 @@ Deno.serve(async (req) => {
 
 ${schemaContext}
 
-You can help users:
-- Query specific tables and filter data
-- Aggregate and analyze data
-- Answer questions about their data
-- Provide insights and summaries
+QUERY CAPABILITIES:
+1. Single-table queries with filtering, sorting, and pagination
+2. Data aggregations (COUNT, SUM, AVG, MIN, MAX)
+3. Multi-table queries via sequential tool calls
 
-When users ask questions about their data, use the query_data tool to fetch the relevant information.
+HANDLING MULTI-TABLE QUERIES:
+When users ask for data that spans multiple tables (e.g., "assessments from the 2020 period"):
+1. First query the reference table to get IDs (e.g., query assessment_periods WHERE name contains '2020')
+2. Then query the main table using those IDs as a filter (e.g., query assessments WHERE assessment_period_id equals the ID from step 1)
+3. Explain what you're doing: "I'll first find the period ID, then query assessments from that period"
 
-Always be concise and helpful. Format data in a readable way.`;
+OPERATOR USAGE:
+- Use 'equals' for exact matches (e.g., status equals 'Active')
+- Use 'contains' for text search (e.g., name contains 'Risk')
+- Use 'in' for matching multiple values (e.g., id in [1, 2, 3])
+- Use 'gt', 'gte', 'lt', 'lte' for numeric/date comparisons
+
+RELATIONSHIPS IN THE DATABASE:
+- assessments.assessment_period_id → assessment_periods.id
+- entities.auditable_entity_type_id → entity_types.id
+- entity_risks.entity_id → entities.id
+- entity_risks.risk_id → risks.id
+- risks.risk_category_id → risk_categories.id
+
+Always be concise and helpful. Format data in a readable way. When executing multi-table queries, briefly explain your approach.`;
 
     // Prepare messages with system context
     const aiMessages: Message[] = [
@@ -105,7 +121,7 @@ Always be concise and helpful. Format data in a readable way.`;
                       type: 'object',
                       properties: {
                         column: { type: 'string' },
-                        operator: { type: 'string', enum: ['eq', 'neq', 'gt', 'gte', 'lt', 'lte', 'like', 'ilike'] },
+                        operator: { type: 'string', enum: ['equals', 'not_equals', 'contains', 'gt', 'gte', 'lt', 'lte', 'in'] },
                         value: { type: 'string' }
                       }
                     },

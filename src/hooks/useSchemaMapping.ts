@@ -18,10 +18,11 @@ export function useSchemaMapping() {
       const { data, error } = await supabase.functions.invoke('create-schema-from-api', {
         body: {
           tableName,
-          columns: columns.map(col => ({
-            name: col.name,
-            type: col.type,
-          })),
+        columns: columns.map(col => ({
+          name: col.name,
+          type: col.type,
+          originalName: col.originalName,
+        })),
           endpointId,
         },
       });

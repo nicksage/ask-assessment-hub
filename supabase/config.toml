@@ -26,3 +26,12 @@ verify_jwt = true
 
 [functions.get-entities-with-risks]
 verify_jwt = true
+
+[functions.generate-tool-definition]
+verify_jwt = true
+
+[functions.generate-tool-code]
+verify_jwt = true
+
+[functions.execute-custom-tool]
+verify_jwt = true

@@ -48,6 +48,9 @@ const Index = () => {
               <DropdownMenuItem onClick={() => navigate('/settings/endpoints')}>
                 Endpoints
               </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => navigate('/settings/tools')}>
+                Tool Builder
+              </DropdownMenuItem>
               <DropdownMenuItem onClick={signOut}>
                 <LogOut className="mr-2 h-4 w-4" />
                 Sign Out

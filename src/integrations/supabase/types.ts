@@ -301,6 +301,57 @@ export type Database = {
           },
         ]
       }
+      custom_tools: {
+        Row: {
+          created_at: string
+          description: string
+          display_name: string
+          edge_function_code: string | null
+          error_message: string | null
+          id: string
+          last_used_at: string | null
+          name: string
+          status: Database["public"]["Enums"]["tool_status"]
+          tables_used: Json
+          tool_schema: Json
+          updated_at: string
+          usage_count: number
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          description: string
+          display_name: string
+          edge_function_code?: string | null
+          error_message?: string | null
+          id?: string
+          last_used_at?: string | null
+          name: string
+          status?: Database["public"]["Enums"]["tool_status"]
+          tables_used?: Json
+          tool_schema: Json
+          updated_at?: string
+          usage_count?: number
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          description?: string
+          display_name?: string
+          edge_function_code?: string | null
+          error_message?: string | null
+          id?: string
+          last_used_at?: string | null
+          name?: string
+          status?: Database["public"]["Enums"]["tool_status"]
+          tables_used?: Json
+          tool_schema?: Json
+          updated_at?: string
+          usage_count?: number
+          user_id?: string
+        }
+        Relationships: []
+      }
       entities: {
         Row: {
           address: string | null
@@ -1387,7 +1438,7 @@ export type Database = {
       }
     }
     Enums: {
-      [_ in never]: never
+      tool_status: "draft" | "generating" | "active" | "error"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -1514,6 +1565,8 @@ export type CompositeTypes<
 
 export const Constants = {
   public: {
-    Enums: {},
+    Enums: {
+      tool_status: ["draft", "generating", "active", "error"],
+    },
   },
 } as const

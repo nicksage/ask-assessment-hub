@@ -7,6 +7,7 @@ import Index from "./pages/Index";
 import Settings from "./pages/Settings";
 import Auth from "./pages/Auth";
 import NotFound from "./pages/NotFound";
+import ToolBuilder from "./pages/ToolBuilder";
 
 const queryClient = new QueryClient();
 
@@ -21,6 +22,7 @@ const App = () => (
           <Route path="/auth" element={<Auth />} />
           <Route path="/settings/api-config" element={<Settings />} />
           <Route path="/settings/endpoints" element={<Settings />} />
+          <Route path="/settings/tools" element={<ToolBuilder />} />
           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
           <Route path="*" element={<NotFound />} />
         </Routes>

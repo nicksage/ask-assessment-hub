@@ -45,6 +45,14 @@ Deno.serve(async (req) => {
       schemaContext = `Available database tables and their schemas:\n${JSON.stringify(schemaData, null, 2)}`;
     }
 
+    // Load user's custom tools
+    const { data: customTools } = await supabase
+      .from('custom_tools')
+      .select('name, tool_schema, description')
+      .eq('status', 'active');
+
+    console.log(`Loaded ${customTools?.length || 0} custom tools for user`);
+
     const LOVABLE_API_KEY = Deno.env.get('LOVABLE_API_KEY');
     if (!LOVABLE_API_KEY) {
       throw new Error('LOVABLE_API_KEY not configured');
@@ -333,9 +341,14 @@ Always be concise and helpful. Format data in a readable way. When executing mul
                   }
                 }
               }
-            }
           }
-        ];
+        }
+      ];
+
+    // Add custom tools
+    if (customTools && customTools.length > 0) {
+      tools.push(...customTools.map(ct => ct.tool_schema));
+    }
 
     // Call Lovable AI with tool definitions
     const aiResponse = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
@@ -418,6 +431,12 @@ Always be concise and helpful. Format data in a readable way. When executing mul
           } else if (functionName === 'get_entities_with_risks') {
             const { data, error } = await supabase.functions.invoke('get-entities-with-risks', {
               body: functionArgs
+            });
+            result = error ? { error: error.message } : data;
+          } else {
+            // Try custom tool
+            const { data, error } = await supabase.functions.invoke('execute-custom-tool', {
+              body: { tool_name: functionName, args: functionArgs }
             });
             result = error ? { error: error.message } : data;
           }

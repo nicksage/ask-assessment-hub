@@ -41,20 +41,8 @@ Deno.serve(async (req) => {
     const { data: schemaData, error: schemaError } = await supabase.functions.invoke('get-schema-registry');
     
     let schemaContext = '';
-    let learnedContext = '';
     if (!schemaError && schemaData) {
       schemaContext = `Available database tables and their schemas:\n${JSON.stringify(schemaData, null, 2)}`;
-      
-      // Add learned patterns to context if available
-      if (schemaData.learned_patterns && schemaData.learned_patterns.patterns && schemaData.learned_patterns.patterns.length > 0) {
-        learnedContext = `\n\nLEARNED QUERY PATTERNS (use these as reference for similar queries):
-${schemaData.learned_patterns.patterns.map((p: any) => 
-  `- When user asks: "${p.user_asks}"
-    Correct interpretation: ${p.correct_interpretation}
-    Tables used: ${JSON.stringify(p.tables_used)}
-    Confidence: ${(p.confidence * 100).toFixed(0)}% | Used ${p.usage_count} times`
-).join('\n')}`;
-      }
     }
 
     const LOVABLE_API_KEY = Deno.env.get('LOVABLE_API_KEY');
@@ -65,15 +53,7 @@ ${schemaData.learned_patterns.patterns.map((p: any) =>
     // System prompt with schema context
     const systemPrompt = `You are an intelligent data assistant that helps users query and analyze their synced data.
 
-${schemaContext}${learnedContext}
-
-QUERY INTERPRETATION PROTOCOL:
-Before executing any queries, ALWAYS explain your interpretation in this format:
-"I understand you want to [interpretation]. I'll [approach]."
-
-Example:
-User: "Show me all products"
-AI: "I understand you want to see all entities where the entity type is 'Product'. I'll first query the entity_types table to find the ID for 'Product', then query the entities table with that type ID. Let me do that now..."
+${schemaContext}
 
 QUERY CAPABILITIES:
 1. Single-table queries with filtering, sorting, and pagination
@@ -371,23 +351,6 @@ Always be concise and helpful. Format data in a readable way. When executing mul
     const finalMessage = currentResponse.choices[0].message.content;
     
     console.log(`Query completed after ${iterationCount} iteration(s)`);
-    
-    // Detect and store learning patterns from user feedback
-    if (messages.length >= 2) {
-      const lastUserMessage = messages[messages.length - 1].content.toLowerCase();
-      const isConfirmation = /^(yes|correct|right|exactly|that'?s right|perfect|thanks?|thank you)/i.test(lastUserMessage);
-      const isCorrection = /(no|not|actually|instead|i meant|wrong)/i.test(lastUserMessage);
-      
-      if (messages.length >= 3 && (isConfirmation || isCorrection)) {
-        // Get the query that was just confirmed/corrected
-        const userQuery = messages[messages.length - 2]?.content;
-        const aiInterpretation = conversationHistory.find(m => m.role === 'assistant' && m.content)?.content;
-        
-        if (userQuery && aiInterpretation) {
-          await storeQueryLearning(supabase, user.id, userQuery, aiInterpretation, isConfirmation ? 'confirmed' : 'corrected');
-        }
-      }
-    }
 
     return new Response(
       JSON.stringify({ 
@@ -410,76 +373,3 @@ Always be concise and helpful. Format data in a readable way. When executing mul
     );
   }
 });
-
-// Helper function to extract table names from AI interpretation text
-function extractTablesFromInterpretation(interpretation: string): string[] {
-  const tablePattern = /\b(assessments|entities|risks|entity_risks|assessment_periods|entity_types|risk_categories)\b/gi;
-  const matches = interpretation.match(tablePattern);
-  return matches ? [...new Set(matches.map(t => t.toLowerCase()))] : [];
-}
-
-// Helper function to store query learning patterns
-async function storeQueryLearning(
-  supabase: any,
-  userId: string,
-  queryPattern: string,
-  interpretation: string,
-  confirmationType: string
-) {
-  try {
-    console.log(`Storing learning: ${confirmationType} - "${queryPattern}"`);
-    
-    const tablesInvolved = extractTablesFromInterpretation(interpretation);
-    
-    // Check if similar pattern exists
-    const { data: existing, error: existingError } = await supabase
-      .from('query_learnings')
-      .select('*')
-      .eq('user_id', userId)
-      .ilike('query_pattern', `%${queryPattern.substring(0, 50)}%`)
-      .maybeSingle();
-    
-    if (existingError) {
-      console.error('Error checking existing learning:', existingError);
-    }
-    
-    if (existing) {
-      // Update existing learning - increase confidence and usage
-      const newConfidence = Math.min(existing.confidence_score + 0.1, 1.0);
-      const { error: updateError } = await supabase
-        .from('query_learnings')
-        .update({
-          usage_count: existing.usage_count + 1,
-          confidence_score: newConfidence,
-          updated_at: new Date().toISOString()
-        })
-        .eq('id', existing.id);
-      
-      if (updateError) {
-        console.error('Error updating learning:', updateError);
-      } else {
-        console.log(`Updated existing learning. New confidence: ${newConfidence}, usage: ${existing.usage_count + 1}`);
-      }
-    } else {
-      // Create new learning
-      const { error: insertError } = await supabase
-        .from('query_learnings')
-        .insert({
-          user_id: userId,
-          query_pattern: queryPattern,
-          interpretation: interpretation,
-          tables_involved: tablesInvolved,
-          confirmation_type: confirmationType,
-          confidence_score: confirmationType === 'confirmed' ? 0.7 : 0.5
-        });
-      
-      if (insertError) {
-        console.error('Error inserting learning:', insertError);
-      } else {
-        console.log('Created new learning pattern');
-      }
-    }
-  } catch (error) {
-    console.error('Error in storeQueryLearning:', error);
-  }
-}

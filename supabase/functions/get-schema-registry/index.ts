@@ -55,21 +55,6 @@ Deno.serve(async (req) => {
 
     console.log(`Found ${mappings?.length || 0} schema mappings`);
 
-    // Fetch user's learned query patterns
-    const { data: learnings, error: learningsError } = await supabaseClient
-      .from('query_learnings')
-      .select('*')
-      .eq('user_id', user.id)
-      .gte('confidence_score', 0.6) // Only high-confidence learnings
-      .order('usage_count', { ascending: false })
-      .limit(20);
-
-    if (learningsError) {
-      console.error('Error fetching learnings:', learningsError);
-    }
-
-    console.log(`Found ${learnings?.length || 0} learned patterns`);
-
     // Build schema registry
     const registry = {
       generated_at: new Date().toISOString(),
@@ -118,20 +103,9 @@ Deno.serve(async (req) => {
         })
       ),
       relationships: detectRelationships(mappings || []),
-      learned_patterns: {
-        description: 'Previously confirmed query interpretations for this user',
-        patterns: (learnings || []).map((l: any) => ({
-          user_asks: l.query_pattern,
-          correct_interpretation: l.interpretation,
-          tables_used: l.tables_involved || [],
-          confidence: l.confidence_score,
-          usage_count: l.usage_count,
-          last_used: l.updated_at
-        }))
-      }
     };
 
-    console.log('Schema registry generated successfully with learned patterns');
+    console.log('Schema registry generated successfully');
 
     return new Response(JSON.stringify(registry, null, 2), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },

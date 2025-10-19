@@ -1,3 +1,6 @@
+// Reserved column names that conflict with system-generated columns
+const RESERVED_COLUMNS = ['id', 'user_id', 'source_endpoint_id', 'created_at', 'updated_at'];
+
 export interface ColumnDefinition {
   name: string;
   type: string;
@@ -81,9 +84,14 @@ export function analyzeSchema(data: any, endpointName: string): SchemaAnalysis {
     // Skip internal fields
     if (key.startsWith('_')) return;
     
-    const sanitizedName = key
+    let sanitizedName = key
       .replace(/[^a-z0-9_]/gi, '_')
       .toLowerCase();
+    
+    // Check if it's a reserved column and rename it with 'api_' prefix
+    if (RESERVED_COLUMNS.includes(sanitizedName)) {
+      sanitizedName = `api_${sanitizedName}`;
+    }
     
     columns.push({
       name: sanitizedName,

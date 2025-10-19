@@ -13,7 +13,9 @@ import { Label } from '@/components/ui/label';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Badge } from '@/components/ui/badge';
 import { SchemaAnalysis } from '@/utils/schemaAnalyzer';
-import { Loader2 } from 'lucide-react';
+import { Loader2, AlertCircle } from 'lucide-react';
+
+const RESERVED_COLUMNS = ['id', 'user_id', 'source_endpoint_id', 'created_at', 'updated_at'];
 
 interface AddSchemaDialogProps {
   open: boolean;
@@ -72,10 +74,16 @@ export function AddSchemaDialog({
                     key={idx}
                     className="flex items-center justify-between p-2 bg-muted rounded"
                   >
-                    <div className="flex-1">
+                    <div className="flex-1 flex items-center gap-2">
                       <code className="text-sm font-mono">{col.name}</code>
+                      {col.name.startsWith('api_') && RESERVED_COLUMNS.includes(col.name.substring(4)) && (
+                        <Badge variant="outline" className="text-xs">
+                          <AlertCircle className="h-3 w-3 mr-1" />
+                          Renamed
+                        </Badge>
+                      )}
                       {col.originalName !== col.name && (
-                        <span className="text-xs text-muted-foreground ml-2">
+                        <span className="text-xs text-muted-foreground">
                           (from: {col.originalName})
                         </span>
                       )}

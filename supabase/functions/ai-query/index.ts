@@ -96,8 +96,22 @@ OPERATOR USAGE:
 - Use 'in' for matching multiple values (e.g., id in [1, 2, 3])
 - Use 'gt', 'gte', 'lt', 'lte' for numeric/date comparisons
 
-RELATIONSHIPS IN THE DATABASE:
+⚠️ CRITICAL: RELATIONSHIPS IN THE DATABASE:
+The database has NO foreign key constraints! When the schema shows relationships like:
 - assessments.assessment_period_id → assessment_periods.id
+- risks.risk_category_id → risk_categories.id
+- entity_risks.entity_id → entities.id
+- entity_risks.risk_id → risks.id
+
+These are SUGGESTED relationships only. You must query tables separately using sequential tool calls:
+
+**CORRECT PATTERN** for "Show me assessments from 2020":
+1. Call query_data on assessment_periods WHERE name contains '2020' → Get period IDs
+2. Call query_data on assessments WHERE assessment_period_id in [extracted IDs] → Get assessments
+3. Synthesize answer combining both results
+
+**INCORRECT** (will fail):
+❌ Trying to use joins or foreign key selects in a single query
 - entities.auditable_entity_type_id → entity_types.id
 - entity_risks.entity_id → entities.id
 - entity_risks.risk_id → risks.id

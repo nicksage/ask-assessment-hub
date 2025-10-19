@@ -72,6 +72,14 @@ Deno.serve(async (req) => {
             is_system: false,
           }));
 
+          const systemCols = systemColumns.map((name) => ({
+            name,
+            type: getSystemColumnType(name),
+            description: getSystemColumnDescription(name),
+          }));
+
+          const allColumns = [...systemCols, ...apiColumns];
+
           // Get record count
           const { count, error: countError } = await supabaseClient
             .from(mapping.table_name)
@@ -90,19 +98,18 @@ Deno.serve(async (req) => {
             last_synced: mapping.last_synced_at,
             record_count: count || 0,
             columns: {
-              system: systemColumns.map((name) => ({
-                name,
-                type: getSystemColumnType(name),
-                description: getSystemColumnDescription(name),
-              })),
+              system: systemCols,
               api: apiColumns,
             },
+            available_column_names: allColumns.map(col => col.name),
+            warning: "⚠️ This table has NO foreign key constraints. All _id columns are just number/text fields, not relationships.",
             unique_constraint: '(user_id, source_endpoint_id, id)',
-            sample_queries: generateSampleQueries(mapping.table_name, apiColumns),
+            sample_queries: generateSampleQueries(mapping.table_name, allColumns),
           };
         })
       ),
       relationships: detectRelationships(mappings || []),
+      relationships_note: "⚠️ IMPORTANT: All relationships are SUGGESTED only based on column naming patterns. There are NO actual foreign key constraints in the database. Multi-table queries require sequential queries using .in() filters."
     };
 
     console.log('Schema registry generated successfully');

@@ -54,13 +54,31 @@ Based on the user's description and database schema, generate a complete tool de
 Database Schema:
 ${JSON.stringify(schemaData || schema_registry, null, 2)}
 
+⚠️ CRITICAL DATABASE CONSTRAINTS:
+1. There are NO foreign key relationships in this database
+2. All columns ending in _id are just number/text fields, NOT relationships
+3. Multi-table queries require sequential queries, NOT joins
+
+VALIDATION RULES:
+1. Review the available_column_names for each table in the schema
+2. Only use column names that exist in the schema exactly as shown
+3. Parameters must correspond to actual column names
+4. If the tool needs data from multiple tables, specify in query_logic that it will:
+   - Query table A first to get matching records
+   - Extract IDs from results
+   - Query table B using .in() filter with those IDs
+   - Manually combine the results
+
 Rules:
 1. Function name must be snake_case, descriptive, prefixed with "get_" or "list_"
 2. Include clear description of what the tool does
 3. Define parameters with proper types (string, number, boolean, array)
-4. Include which tables will be queried
-5. Provide plain English description of the query logic
+4. Include which tables will be queried in "tables_used"
+5. In "query_logic", explicitly state if multiple sequential queries are needed
 6. Keep parameters simple and practical
+
+Example query_logic for multi-table:
+"No foreign keys - requires sequential queries: First query risk_categories table to find categories matching the filter. Extract the 'id' values from results. Then query risks table using .in('risk_category_id', extracted_ids). Manually combine results with category names."
 
 Return ONLY valid JSON in this exact format:
 {
@@ -77,7 +95,7 @@ Return ONLY valid JSON in this exact format:
     "required": ["param_name"]
   },
   "tables_used": ["table1", "table2"],
-  "query_logic": "Plain English description of the SQL query logic"
+  "query_logic": "Plain English description of the query logic, including sequential query steps if multiple tables"
 }`;
 
     const response = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {

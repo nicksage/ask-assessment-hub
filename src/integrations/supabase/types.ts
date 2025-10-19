@@ -126,6 +126,131 @@ export type Database = {
           },
         ]
       }
+      assessments: {
+        Row: {
+          admin_team_ids: Json | null
+          api_created_at: string | null
+          api_id: number | null
+          api_updated_at: string | null
+          assessables: Json | null
+          assessment_period_id: string | null
+          assessment_template_id: number | null
+          canceled_by_user_id: string | null
+          canceled_date: string | null
+          confirm_text: string | null
+          created_at: string | null
+          deleted_at: string | null
+          due_date: string | null
+          email_project_start: Json | null
+          enable_not_applicable_response_config: boolean | null
+          finalized_by_user_id: string | null
+          finalized_date: string | null
+          id: string
+          info: string | null
+          instruction_text: string | null
+          landing_text: string | null
+          name: string | null
+          owner_user_ids: Json | null
+          project_options: Json | null
+          review_request_id: string | null
+          source_endpoint_id: string | null
+          started_by_user_id: string | null
+          started_date: string | null
+          status: string | null
+          survey_type: string | null
+          type: string | null
+          updated_at: string | null
+          user_assessment_ids: Json | null
+          user_id: string
+          viewonly_team_ids: Json | null
+          viewonly_user_ids: Json | null
+        }
+        Insert: {
+          admin_team_ids?: Json | null
+          api_created_at?: string | null
+          api_id?: number | null
+          api_updated_at?: string | null
+          assessables?: Json | null
+          assessment_period_id?: string | null
+          assessment_template_id?: number | null
+          canceled_by_user_id?: string | null
+          canceled_date?: string | null
+          confirm_text?: string | null
+          created_at?: string | null
+          deleted_at?: string | null
+          due_date?: string | null
+          email_project_start?: Json | null
+          enable_not_applicable_response_config?: boolean | null
+          finalized_by_user_id?: string | null
+          finalized_date?: string | null
+          id?: string
+          info?: string | null
+          instruction_text?: string | null
+          landing_text?: string | null
+          name?: string | null
+          owner_user_ids?: Json | null
+          project_options?: Json | null
+          review_request_id?: string | null
+          source_endpoint_id?: string | null
+          started_by_user_id?: string | null
+          started_date?: string | null
+          status?: string | null
+          survey_type?: string | null
+          type?: string | null
+          updated_at?: string | null
+          user_assessment_ids?: Json | null
+          user_id: string
+          viewonly_team_ids?: Json | null
+          viewonly_user_ids?: Json | null
+        }
+        Update: {
+          admin_team_ids?: Json | null
+          api_created_at?: string | null
+          api_id?: number | null
+          api_updated_at?: string | null
+          assessables?: Json | null
+          assessment_period_id?: string | null
+          assessment_template_id?: number | null
+          canceled_by_user_id?: string | null
+          canceled_date?: string | null
+          confirm_text?: string | null
+          created_at?: string | null
+          deleted_at?: string | null
+          due_date?: string | null
+          email_project_start?: Json | null
+          enable_not_applicable_response_config?: boolean | null
+          finalized_by_user_id?: string | null
+          finalized_date?: string | null
+          id?: string
+          info?: string | null
+          instruction_text?: string | null
+          landing_text?: string | null
+          name?: string | null
+          owner_user_ids?: Json | null
+          project_options?: Json | null
+          review_request_id?: string | null
+          source_endpoint_id?: string | null
+          started_by_user_id?: string | null
+          started_date?: string | null
+          status?: string | null
+          survey_type?: string | null
+          type?: string | null
+          updated_at?: string | null
+          user_assessment_ids?: Json | null
+          user_id?: string
+          viewonly_team_ids?: Json | null
+          viewonly_user_ids?: Json | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "assessments_source_endpoint_id_fkey"
+            columns: ["source_endpoint_id"]
+            isOneToOne: false
+            referencedRelation: "api_endpoints"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       [_ in never]: never

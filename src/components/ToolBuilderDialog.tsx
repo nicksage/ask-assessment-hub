@@ -108,6 +108,7 @@ export const ToolBuilderDialog = ({
 
       // Save to database
       const { error: dbError } = await supabase.from("custom_tools").insert({
+        name: toolDefinition.function_name,
         display_name:
           toolDefinition.function_name
             .split("_")
@@ -203,7 +204,10 @@ export const ToolBuilderDialog = ({
                 <Label>Description</Label>
                 <Textarea
                   value={toolDefinition.description}
-                  disabled
+                  onChange={(e) => setToolDefinition({
+                    ...toolDefinition,
+                    description: e.target.value
+                  })}
                   rows={2}
                   className="resize-none"
                 />

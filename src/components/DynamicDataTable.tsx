@@ -1,7 +1,7 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Database } from 'lucide-react';
+import { Database, RefreshCw } from 'lucide-react';
 import { ApiEndpoint } from './EndpointManager';
 import { analyzeSchema, SchemaAnalysis } from '@/utils/schemaAnalyzer';
 import { useSchemaMapping } from '@/hooks/useSchemaMapping';
@@ -15,12 +15,38 @@ interface DynamicDataTableProps {
 export function DynamicDataTable({ data, endpoint }: DynamicDataTableProps) {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [analyzedSchema, setAnalyzedSchema] = useState<SchemaAnalysis | null>(null);
-  const { createSchema, isCreating } = useSchemaMapping();
+  const [existingSchema, setExistingSchema] = useState<any>(null);
+  const { createSchema, isCreating, checkExistingSchema, syncSchema, isSyncing } = useSchemaMapping();
+
+  useEffect(() => {
+    const loadExistingSchema = async () => {
+      const schema = await checkExistingSchema(endpoint.id);
+      setExistingSchema(schema);
+    };
+
+    loadExistingSchema();
+  }, [endpoint.id]);
 
   const handleAddToSchema = () => {
     const schema = analyzeSchema(data, endpoint.name);
     setAnalyzedSchema(schema);
     setDialogOpen(true);
+  };
+
+  const handleSyncSchema = async () => {
+    if (!existingSchema) return;
+
+    const result = await syncSchema(
+      endpoint.id,
+      existingSchema.table_name,
+      data
+    );
+
+    if (result.success) {
+      // Optionally refresh the existing schema
+      const schema = await checkExistingSchema(endpoint.id);
+      setExistingSchema(schema);
+    }
   };
 
   const handleConfirmSchema = async (tableName: string, selectedColumns: any[]) => {
@@ -34,6 +60,9 @@ export function DynamicDataTable({ data, endpoint }: DynamicDataTableProps) {
     
     if (result.success) {
       setDialogOpen(false);
+      // Refresh to show the new schema
+      const schema = await checkExistingSchema(endpoint.id);
+      setExistingSchema(schema);
     }
   };
 
@@ -47,10 +76,17 @@ export function DynamicDataTable({ data, endpoint }: DynamicDataTableProps) {
         <pre className="bg-muted p-4 rounded-lg overflow-auto max-h-96 text-sm">
           {JSON.stringify(data, null, 2)}
         </pre>
-        <Button size="sm" onClick={handleAddToSchema} disabled={isCreating} className="w-1/4">
-          <Database className="mr-2 h-4 w-4" />
-          Add to Schema
-        </Button>
+        {existingSchema ? (
+          <Button size="sm" onClick={handleSyncSchema} disabled={isSyncing} className="w-1/4">
+            <RefreshCw className="mr-2 h-4 w-4" />
+            {isSyncing ? 'Syncing...' : 'Sync Data'}
+          </Button>
+        ) : (
+          <Button size="sm" onClick={handleAddToSchema} disabled={isCreating} className="w-1/4">
+            <Database className="mr-2 h-4 w-4" />
+            Add to Schema
+          </Button>
+        )}
       </CardContent>
 
       <AddSchemaDialog

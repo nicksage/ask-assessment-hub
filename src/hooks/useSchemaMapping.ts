@@ -5,6 +5,7 @@ import { ColumnDefinition } from '@/utils/schemaAnalyzer';
 
 export function useSchemaMapping() {
   const [isCreating, setIsCreating] = useState(false);
+  const [isSyncing, setIsSyncing] = useState(false);
 
   const createSchema = async (
     tableName: string,
@@ -57,8 +58,79 @@ export function useSchemaMapping() {
     }
   };
 
+  const checkExistingSchema = async (endpointId: string) => {
+    try {
+      const { data, error } = await supabase
+        .from('api_schema_mappings')
+        .select('*')
+        .eq('endpoint_id', endpointId)
+        .maybeSingle();
+
+      if (error) {
+        console.error('Error checking existing schema:', error);
+        return null;
+      }
+
+      return data;
+    } catch (err) {
+      console.error('Exception checking existing schema:', err);
+      return null;
+    }
+  };
+
+  const syncSchema = async (
+    endpointId: string,
+    tableName: string,
+    newData: any
+  ) => {
+    setIsSyncing(true);
+    
+    try {
+      const { data, error } = await supabase.functions.invoke('sync-schema-data', {
+        body: {
+          endpointId,
+          tableName,
+          newData,
+        },
+      });
+
+      if (error) {
+        console.error('Error syncing schema:', error);
+        toast.error('Failed to sync data', {
+          description: error.message,
+        });
+        return { success: false, error };
+      }
+
+      if (data?.error) {
+        toast.error('Failed to sync data', {
+          description: data.error,
+        });
+        return { success: false, error: data.error };
+      }
+
+      toast.success('Data synced successfully!', {
+        description: `${data.recordsInserted || 0} record(s) added to "${tableName}".`,
+      });
+
+      return { success: true, data };
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : 'Unknown error';
+      console.error('Exception syncing schema:', err);
+      toast.error('Failed to sync data', {
+        description: errorMessage,
+      });
+      return { success: false, error: errorMessage };
+    } finally {
+      setIsSyncing(false);
+    }
+  };
+
   return {
     createSchema,
     isCreating,
+    checkExistingSchema,
+    syncSchema,
+    isSyncing,
   };
 }

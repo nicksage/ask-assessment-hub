@@ -104,6 +104,7 @@ Deno.serve(async (req) => {
             available_column_names: allColumns.map(col => col.name),
             warning: "⚠️ This table has NO foreign key constraints. All _id columns are just number/text fields, not relationships.",
             unique_constraint: '(user_id, source_endpoint_id, id)',
+            suggested_relationships: detectTableRelationships(mapping.table_name, apiColumns, mappings),
             sample_queries: generateSampleQueries(mapping.table_name, allColumns),
           };
         })
@@ -177,6 +178,36 @@ interface Relationship {
   to_column: string;
   relationship_type: string;
   confidence: string;
+}
+
+interface SuggestedRelationship {
+  column: string;
+  suggests_link_to: string;
+  link_column: string;
+  query_pattern: string;
+}
+
+function detectTableRelationships(tableName: string, columns: any[], allMappings: any[]): SuggestedRelationship[] {
+  const relationships: SuggestedRelationship[] = [];
+  
+  columns.forEach((col) => {
+    if (col.name.endsWith('_id')) {
+      // Try to find matching table
+      const potentialTable = col.name.replace(/_id$/, '') + 's';
+      const targetMapping = allMappings.find((m) => m.table_name === potentialTable);
+      
+      if (targetMapping) {
+        relationships.push({
+          column: col.name,
+          suggests_link_to: potentialTable,
+          link_column: 'id',
+          query_pattern: `First query '${potentialTable}' to get IDs, then query '${tableName}' using .in('${col.name}', ids)`
+        });
+      }
+    }
+  });
+  
+  return relationships;
 }
 
 function detectRelationships(mappings: any[]): Relationship[] {

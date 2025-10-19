@@ -59,11 +59,21 @@ export const ToolBuilderDialog = ({
     try {
       setLoading(true);
 
-      // Generate tool definition
+      // Fetch schema registry first
+      const { data: schemaData, error: schemaError } = await supabase.functions.invoke(
+        "get-schema-registry"
+      );
+
+      if (schemaError) throw schemaError;
+
+      // Generate tool definition WITH schema context
       const { data, error } = await supabase.functions.invoke(
         "generate-tool-definition",
         {
-          body: { description },
+          body: { 
+            description,
+            schema_registry: schemaData
+          },
         }
       );
 
@@ -97,11 +107,21 @@ export const ToolBuilderDialog = ({
         throw new Error("Not authenticated");
       }
 
-      // Generate code
+      // Fetch schema registry for code generation
+      const { data: schemaData, error: schemaError } = await supabase.functions.invoke(
+        "get-schema-registry"
+      );
+
+      if (schemaError) throw schemaError;
+
+      // Generate code WITH schema context
       const { data: codeData, error: codeError } = await supabase.functions.invoke(
         "generate-tool-code",
         {
-          body: { tool_definition: toolDefinition },
+          body: { 
+            tool_definition: toolDefinition,
+            schema_registry: schemaData
+          },
         }
       );
 

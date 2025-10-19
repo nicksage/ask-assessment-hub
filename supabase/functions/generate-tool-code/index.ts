@@ -36,6 +36,13 @@ Deno.serve(async (req) => {
       });
     }
 
+    // Use provided schema or fetch it
+    let schemaData = schema_registry;
+    if (!schemaData) {
+      const { data: fetchedSchema } = await supabase.functions.invoke('get-schema-registry');
+      schemaData = fetchedSchema;
+    }
+
     const LOVABLE_API_KEY = Deno.env.get('LOVABLE_API_KEY');
     if (!LOVABLE_API_KEY) {
       return new Response(JSON.stringify({ error: 'LOVABLE_API_KEY not configured' }), {
@@ -52,19 +59,25 @@ Tool Details:
 ${JSON.stringify(tool_definition, null, 2)}
 
 Database Schema:
-${JSON.stringify(schema_registry, null, 2)}
+${JSON.stringify(schemaData, null, 2)}
 
 ⚠️ CRITICAL DATABASE CONSTRAINTS:
-1. There are NO foreign key relationships in this database
-2. You MUST only use column names that exist in the schema exactly as shown
-3. For multi-table queries, you MUST query tables sequentially, NOT with joins
-4. You CANNOT use Supabase's automatic joins or foreign key selects
-5. All columns ending in _id are just number/text fields, NOT relationships
+1. There are NO foreign key constraints in this database
+2. You MUST only use column names from the schema's available_column_names arrays
+3. For multi-table queries, you MUST query tables sequentially
+4. You cannot use Supabase joins or foreign key syntax like .select('risks(*)')
+
+⚠️ HANDLING RELATIONSHIP COLUMNS:
+- Any column ending in _id suggests a relationship to another table
+- Check the 'suggested_relationships' field in each table's schema  
+- If filtering by type/category name, query the related table first to get IDs
+- Then use .in() to filter the main table by those IDs
 
 BEFORE WRITING CODE:
-1. List the exact columns available in each table you'll query from the schema
-2. Verify the column names match the schema exactly (case-sensitive)
+1. List the exact columns available in each table you'll query (from available_column_names)
+2. Verify all column names match the schema exactly
 3. Plan the query sequence if multiple tables are needed
+4. Check suggested_relationships for potential links
 
 Requirements:
 1. Generate ONLY the query logic, NOT a complete edge function
@@ -107,55 +120,76 @@ try {
   return { success: false, error: error.message };
 }
 
-MULTI-TABLE QUERY PATTERN (NO FOREIGN KEYS):
+REAL-WORLD EXAMPLE - Entities by Type:
+
+User asks: "Get all Department entities"
+Schema shows: 
+  - entities table: auditable_entity_type_id (bigint), id (bigint), name (text)
+  - entity_types table: id (bigint), name (text), key (text)
+  - Suggested relationship: entities.auditable_entity_type_id → entity_types.id
+
+Generated code:
 try {
   console.log('Executing tool with args:', args);
   
-  if (!args.category_name) {
-    return { success: false, error: 'category_name is required' };
+  if (!args.type_name) {
+    return { success: false, error: 'type_name parameter is required' };
   }
   
-  // Step 1: Find category IDs matching the filter
-  const { data: categories, error: catError } = await supabase
-    .from('risk_categories')
-    .select('id, name')
-    .ilike('name', \`%\${args.category_name}%\`);
+  // Step 1: Find entity type IDs by name
+  const { data: entityTypes, error: typeError } = await supabase
+    .from('entity_types')
+    .select('id, name, key')
+    .ilike('name', \`%\${args.type_name}%\`);
   
-  if (catError) {
-    console.error('Category query error:', catError);
-    return { success: false, error: catError.message };
+  if (typeError) {
+    console.error('Entity type query error:', typeError);
+    return { success: false, error: typeError.message };
   }
   
-  if (categories.length === 0) {
-    return { success: true, count: 0, data: [], message: 'No matching categories found' };
+  if (entityTypes.length === 0) {
+    return { 
+      success: true, 
+      count: 0, 
+      data: [], 
+      message: 'No entity types found matching that name' 
+    };
   }
   
-  const categoryIds = categories.map(c => c.id);
-  console.log('Found category IDs:', categoryIds);
+  const typeIds = entityTypes.map(t => t.id);
+  console.log('Found entity type IDs:', typeIds);
   
-  // Step 2: Get risks for those categories using .in()
-  const { data: risks, error: riskError } = await supabase
-    .from('risks')
-    .select('id, name, risk_category_id, status, description')
-    .in('risk_category_id', categoryIds);
+  // Step 2: Get entities with those type IDs
+  const { data: entities, error: entityError } = await supabase
+    .from('entities')
+    .select('id, name, auditable_entity_type_id, description, created_at')
+    .in('auditable_entity_type_id', typeIds);
   
-  if (riskError) {
-    console.error('Risk query error:', riskError);
-    return { success: false, error: riskError.message };
+  if (entityError) {
+    console.error('Entity query error:', entityError);
+    return { success: false, error: entityError.message };
   }
   
-  // Step 3: Manually combine results
-  const combined = risks.map(risk => ({
-    ...risk,
-    category_name: categories.find(c => c.id === risk.risk_category_id)?.name
+  // Step 3: Enrich entities with type name
+  const enriched = entities.map(entity => ({
+    ...entity,
+    entity_type_name: entityTypes.find(t => t.id === entity.auditable_entity_type_id)?.name
   }));
   
-  console.log('Query successful, returned', combined.length, 'risks');
-  return { success: true, count: combined.length, data: combined };
+  console.log('Query successful, returned', enriched.length, 'entities');
+  return { success: true, count: enriched.length, data: enriched };
+  
 } catch (error) {
   console.error('Execution error:', error);
   return { success: false, error: error.message };
 }
+
+COLUMN NAME VALIDATION (CRITICAL):
+- ONLY use column names from the schema's available_column_names array
+- NEVER assume or invent column names (e.g., no 'type' column in entities)
+- NEVER use foreign key syntax like .select('risks(*)')
+- NEVER use !inner joins - there are no foreign keys
+- If a column ends in _id, it's a number field suggesting a relationship
 
 FORBIDDEN PATTERNS (will cause errors):
 ❌ .select('risks(*)') - No foreign key relationships
@@ -213,6 +247,19 @@ Return ONLY the query logic code, nothing else.`;
     // Clean up extra whitespace
     code = code.trim();
 
+    // Validate column names against schema
+    const validation = validateGeneratedCode(code, schemaData, tool_definition.tables_used);
+    if (!validation.valid) {
+      console.error('Column validation failed:', validation.errors);
+      return new Response(JSON.stringify({ 
+        success: false,
+        error: `Generated code uses invalid columns: ${validation.errors.join(', ')}`
+      }), {
+        status: 400,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
     return new Response(JSON.stringify({
       success: true,
       edge_function_code: code.trim()
@@ -230,3 +277,70 @@ Return ONLY the query logic code, nothing else.`;
     });
   }
 });
+
+function extractColumnNames(code: string): Map<string, string[]> {
+  const tableColumns = new Map<string, string[]>();
+  
+  // Extract .from('table_name') to identify tables
+  const fromPattern = /\.from\(['"](\w+)['"]\)/g;
+  const tables = new Set<string>();
+  let match;
+  while ((match = fromPattern.exec(code)) !== null) {
+    tables.add(match[1]);
+  }
+  
+  // For each table, extract column names used in that context
+  tables.forEach(table => {
+    const columns = new Set<string>();
+    
+    // Find all .select, .eq, .in, .ilike patterns after this table
+    const tableContext = code.split(`.from('${table}')`)[1]?.split('.from(')[0] || '';
+    
+    // Extract from .select()
+    const selectPattern = /\.select\(['"]([^'"]+)['"]\)/g;
+    while ((match = selectPattern.exec(tableContext)) !== null) {
+      match[1].split(',').forEach(col => {
+        const cleanCol = col.trim().split(' ')[0]; // Remove aliases
+        if (cleanCol !== '*') columns.add(cleanCol);
+      });
+    }
+    
+    // Extract from .eq(), .in(), .ilike(), etc.
+    const filterPattern = /\.(eq|in|ilike|gt|gte|lt|lte|neq)\(['"](\w+)['"]/g;
+    while ((match = filterPattern.exec(tableContext)) !== null) {
+      columns.add(match[2]);
+    }
+    
+    tableColumns.set(table, Array.from(columns));
+  });
+  
+  return tableColumns;
+}
+
+function validateGeneratedCode(
+  code: string, 
+  schema: any, 
+  tablesUsed: string[]
+): { valid: boolean; errors: string[] } {
+  const errors: string[] = [];
+  const usedColumns = extractColumnNames(code);
+  
+  usedColumns.forEach((columns, tableName) => {
+    const tableSchema = schema.tables?.find((t: any) => t.table_name === tableName);
+    
+    if (!tableSchema) {
+      errors.push(`Table '${tableName}' not found in schema`);
+      return;
+    }
+    
+    const availableColumns = tableSchema.available_column_names || [];
+    
+    columns.forEach(col => {
+      if (!availableColumns.includes(col)) {
+        errors.push(`Column '${col}' does not exist in table '${tableName}'. Available: ${availableColumns.join(', ')}`);
+      }
+    });
+  });
+  
+  return { valid: errors.length === 0, errors };
+}

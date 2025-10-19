@@ -5,3 +5,9 @@ verify_jwt = false
 
 [functions.get-schema-registry]
 verify_jwt = true
+
+[functions.query-builder]
+verify_jwt = true
+
+[functions.analytics-query]
+verify_jwt = true

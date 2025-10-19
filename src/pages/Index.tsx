@@ -1,11 +1,9 @@
-import { useState, useEffect } from 'react';
-import { ApiKeyInput } from '@/components/ApiKeyInput';
-import { ChatInterface } from '@/components/ChatInterface';
-import { Toaster } from '@/components/ui/toaster';
+import { useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Settings, LogOut } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
+import { AIChatInterface } from '@/components/AIChatInterface';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -14,7 +12,6 @@ import {
 } from '@/components/ui/dropdown-menu';
 
 const Index = () => {
-  const [apiKey, setApiKey] = useState<string | null>(null);
   const navigate = useNavigate();
   const { user, loading: authLoading, signOut } = useAuth();
 
@@ -24,54 +21,44 @@ const Index = () => {
     }
   }, [user, authLoading, navigate]);
 
-  useEffect(() => {
-    const stored = localStorage.getItem('openai_api_key');
-    if (stored) setApiKey(stored);
-  }, []);
-
   if (authLoading) {
     return <div className="min-h-screen bg-background flex items-center justify-center">Loading...</div>;
   }
 
-  if (!apiKey) {
-    return (
-      <>
-        <ApiKeyInput onApiKeySet={setApiKey} />
-        <Toaster />
-      </>
-    );
-  }
-
   return (
-    <>
-      <div className="relative">
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button
-              variant="ghost"
-              size="icon"
-              className="absolute top-4 right-4 z-10"
-            >
-              <Settings className="h-5 w-5" />
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end" className="w-56 bg-background z-50">
-            <DropdownMenuItem onClick={() => navigate('/settings/api-config')}>
-              API Configuration
-            </DropdownMenuItem>
-            <DropdownMenuItem onClick={() => navigate('/settings/endpoints')}>
-              Endpoints
-            </DropdownMenuItem>
-            <DropdownMenuItem onClick={signOut}>
-              <LogOut className="mr-2 h-4 w-4" />
-              Sign Out
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
-        <ChatInterface apiKey={apiKey} />
+    <div className="min-h-screen bg-background">
+      <div className="container mx-auto py-8">
+        <div className="flex justify-between items-center mb-8">
+          <div>
+            <h1 className="text-4xl font-bold">Data Insights Assistant</h1>
+            <p className="text-muted-foreground mt-2">
+              Ask questions about your synced data and get intelligent answers
+            </p>
+          </div>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="ghost" size="icon">
+                <Settings className="h-5 w-5" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-56">
+              <DropdownMenuItem onClick={() => navigate('/settings/api-config')}>
+                API Configuration
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => navigate('/settings/endpoints')}>
+                Endpoints
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={signOut}>
+                <LogOut className="mr-2 h-4 w-4" />
+                Sign Out
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </div>
+
+        <AIChatInterface />
       </div>
-      <Toaster />
-    </>
+    </div>
   );
 };
 

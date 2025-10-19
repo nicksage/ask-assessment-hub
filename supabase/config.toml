@@ -15,17 +15,6 @@ verify_jwt = true
 [functions.ai-query]
 verify_jwt = true
 
-[functions.get-entities-by-type]
-verify_jwt = true
-
-[functions.get-risks-by-category]
-verify_jwt = true
-
-[functions.get-assessments-by-filter]
-verify_jwt = true
-
-[functions.get-entities-with-risks]
-verify_jwt = true
 
 [functions.generate-tool-definition]
 verify_jwt = true

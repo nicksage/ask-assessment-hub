@@ -7,7 +7,6 @@ import { useToast } from '@/hooks/use-toast';
 import { Settings as SettingsIcon, ArrowLeft, LogOut } from 'lucide-react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { EndpointManager } from '@/components/EndpointManager';
-import { EdgeFunctionTester } from '@/components/EdgeFunctionTester';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 interface ApiConfig {
@@ -36,7 +35,6 @@ const Settings = () => {
   } = useAuth();
   const isApiConfig = location.pathname === '/settings/api-config';
   const isEndpoints = location.pathname === '/settings/endpoints';
-  const isTestFunctions = location.pathname === '/settings/test-functions';
   useEffect(() => {
     if (!authLoading && !user) {
       navigate('/auth');
@@ -135,31 +133,12 @@ const Settings = () => {
             </Button>
             <div className="flex items-center gap-2">
               <SettingsIcon className="h-6 w-6" />
-              <h1 className="text-3xl font-bold">Settings</h1>
+              <h1 className="text-3xl font-bold">
+                {isApiConfig ? 'API Configuration' : 'Endpoints'}
+              </h1>
             </div>
           </div>
           
-        </div>
-
-        <div className="flex gap-2 mb-6">
-          <Button
-            variant={isApiConfig ? "default" : "outline"}
-            onClick={() => navigate('/settings/api-config')}
-          >
-            API Config
-          </Button>
-          <Button
-            variant={isEndpoints ? "default" : "outline"}
-            onClick={() => navigate('/settings/endpoints')}
-          >
-            Endpoints
-          </Button>
-          <Button
-            variant={isTestFunctions ? "default" : "outline"}
-            onClick={() => navigate('/settings/test-functions')}
-          >
-            Test Functions
-          </Button>
         </div>
 
         {isApiConfig && <Card>
@@ -199,8 +178,6 @@ const Settings = () => {
           </Card>}
 
         {isEndpoints && <EndpointManager configId={configId} />}
-
-        {isTestFunctions && <EdgeFunctionTester />}
       </div>
     </div>;
 };

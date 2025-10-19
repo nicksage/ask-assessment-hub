@@ -5,6 +5,9 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Database } from 'lucide-react';
 import { ApiEndpoint } from './EndpointManager';
+import { analyzeSchema, SchemaAnalysis } from '@/utils/schemaAnalyzer';
+import { useSchemaMapping } from '@/hooks/useSchemaMapping';
+import { AddSchemaDialog } from './AddSchemaDialog';
 
 interface DynamicDataTableProps {
   data: any;
@@ -13,6 +16,29 @@ interface DynamicDataTableProps {
 
 export function DynamicDataTable({ data, endpoint }: DynamicDataTableProps) {
   const [activeTab, setActiveTab] = useState<'table' | 'json'>('table');
+  const [dialogOpen, setDialogOpen] = useState(false);
+  const [analyzedSchema, setAnalyzedSchema] = useState<SchemaAnalysis | null>(null);
+  const { createSchema, isCreating } = useSchemaMapping();
+
+  const handleAddToSchema = () => {
+    const schema = analyzeSchema(data, endpoint.name);
+    setAnalyzedSchema(schema);
+    setDialogOpen(true);
+  };
+
+  const handleConfirmSchema = async (tableName: string) => {
+    if (!analyzedSchema) return;
+    
+    const result = await createSchema(
+      tableName,
+      analyzedSchema.columns,
+      endpoint.id
+    );
+    
+    if (result.success) {
+      setDialogOpen(false);
+    }
+  };
 
   const renderTable = (obj: any) => {
     if (Array.isArray(obj) && obj.length > 0) {
@@ -81,7 +107,7 @@ export function DynamicDataTable({ data, endpoint }: DynamicDataTableProps) {
       <CardHeader>
         <div className="flex items-center justify-between">
           <CardTitle>Response Data</CardTitle>
-          <Button size="sm" variant="outline">
+          <Button size="sm" variant="outline" onClick={handleAddToSchema} disabled={isCreating}>
             <Database className="mr-2 h-4 w-4" />
             Add to Schema
           </Button>
@@ -105,6 +131,14 @@ export function DynamicDataTable({ data, endpoint }: DynamicDataTableProps) {
           </TabsContent>
         </Tabs>
       </CardContent>
+
+      <AddSchemaDialog
+        open={dialogOpen}
+        onOpenChange={setDialogOpen}
+        schema={analyzedSchema}
+        onConfirm={handleConfirmSchema}
+        isCreating={isCreating}
+      />
     </Card>
   );
 }

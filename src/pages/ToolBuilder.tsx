@@ -26,19 +26,21 @@ interface CustomTool {
 const ToolBuilder = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
-  const { user } = useAuth();
+  const { user, loading: authLoading } = useAuth();
   const [tools, setTools] = useState<CustomTool[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
   const [showCreateDialog, setShowCreateDialog] = useState(false);
 
   useEffect(() => {
-    if (!user) {
+    if (!authLoading && !user) {
       navigate("/auth");
       return;
     }
-    loadTools();
-  }, [user, navigate]);
+    if (user) {
+      loadTools();
+    }
+  }, [user, authLoading, navigate]);
 
   const loadTools = async () => {
     try {

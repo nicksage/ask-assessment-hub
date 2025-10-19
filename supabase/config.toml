@@ -2,3 +2,6 @@ project_id = "zhpunscluuswszswsiqp"
 
 [functions.orchestrator]
 verify_jwt = false
+
+[functions.get-schema-registry]
+verify_jwt = true

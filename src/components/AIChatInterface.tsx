@@ -94,13 +94,6 @@ export function AIChatInterface() {
 
   return (
     <div className="flex flex-col h-[calc(100vh-12rem)]">
-      <div className="mb-4">
-        <h2 className="text-2xl font-bold mb-2">AI Data Assistant</h2>
-        <p className="text-muted-foreground">
-          Ask questions about your synced data and get intelligent insights
-        </p>
-      </div>
-
       <Card className="flex-1 flex flex-col">
         <ScrollArea className="flex-1 p-4" ref={scrollRef}>
           {messages.length === 0 ? (

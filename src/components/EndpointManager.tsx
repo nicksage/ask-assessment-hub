@@ -10,181 +10,153 @@ import { useToast } from '@/hooks/use-toast';
 import { ApiTester } from './ApiTester';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
-
 export interface ApiEndpoint {
   id: string;
   name: string;
   method: 'GET' | 'POST' | 'PUT' | 'DELETE';
   path: string;
 }
-
 interface EndpointManagerProps {
   configId: string | null;
 }
-
-export function EndpointManager({ configId }: EndpointManagerProps) {
+export function EndpointManager({
+  configId
+}: EndpointManagerProps) {
   const [endpoints, setEndpoints] = useState<ApiEndpoint[]>([]);
   const [newEndpoint, setNewEndpoint] = useState<Omit<ApiEndpoint, 'id'>>({
     name: '',
     method: 'GET',
-    path: '',
+    path: ''
   });
   const [selectedEndpoint, setSelectedEndpoint] = useState<ApiEndpoint | null>(null);
   const [dialogOpen, setDialogOpen] = useState(false);
-  const { toast } = useToast();
-  const { user } = useAuth();
-
+  const {
+    toast
+  } = useToast();
+  const {
+    user
+  } = useAuth();
   useEffect(() => {
     if (!user || !configId) return;
-
     const loadEndpoints = async () => {
       // Try to migrate localStorage data first
       const stored = localStorage.getItem('api_endpoints');
       if (stored) {
         const localEndpoints = JSON.parse(stored);
-        
         for (const endpoint of localEndpoints) {
-          const { data: existing } = await supabase
-            .from('api_endpoints')
-            .select('*')
-            .eq('user_id', user.id)
-            .eq('name', endpoint.name)
-            .single();
-
+          const {
+            data: existing
+          } = await supabase.from('api_endpoints').select('*').eq('user_id', user.id).eq('name', endpoint.name).single();
           if (!existing) {
-            await supabase
-              .from('api_endpoints')
-              .insert({
-                user_id: user.id,
-                config_id: configId,
-                name: endpoint.name,
-                method: endpoint.method,
-                path: endpoint.path,
-              });
+            await supabase.from('api_endpoints').insert({
+              user_id: user.id,
+              config_id: configId,
+              name: endpoint.name,
+              method: endpoint.method,
+              path: endpoint.path
+            });
           }
         }
         localStorage.removeItem('api_endpoints');
       }
 
       // Load from database
-      const { data, error } = await supabase
-        .from('api_endpoints')
-        .select('*')
-        .eq('user_id', user.id)
-        .eq('config_id', configId);
-
+      const {
+        data,
+        error
+      } = await supabase.from('api_endpoints').select('*').eq('user_id', user.id).eq('config_id', configId);
       if (error) {
         console.error('Error loading endpoints:', error);
         return;
       }
-
       setEndpoints(data.map(e => ({
         id: e.id,
         name: e.name,
         method: e.method as any,
-        path: e.path,
+        path: e.path
       })));
     };
-
     loadEndpoints();
   }, [user, configId]);
-
   const handleAdd = async () => {
     if (!newEndpoint.name || !newEndpoint.path || !user || !configId) {
       toast({
         title: "Missing fields",
         description: "Please fill in all fields",
-        variant: "destructive",
+        variant: "destructive"
       });
       return;
     }
-
-    const { data, error } = await supabase
-      .from('api_endpoints')
-      .insert({
-        user_id: user.id,
-        config_id: configId,
-        name: newEndpoint.name,
-        method: newEndpoint.method,
-        path: newEndpoint.path,
-      })
-      .select()
-      .single();
-
+    const {
+      data,
+      error
+    } = await supabase.from('api_endpoints').insert({
+      user_id: user.id,
+      config_id: configId,
+      name: newEndpoint.name,
+      method: newEndpoint.method,
+      path: newEndpoint.path
+    }).select().single();
     if (error) {
       toast({
         title: "Error",
         description: error.message,
-        variant: "destructive",
+        variant: "destructive"
       });
       return;
     }
-
     const endpoint: ApiEndpoint = {
       id: data.id,
       name: data.name,
       method: data.method as any,
-      path: data.path,
+      path: data.path
     };
-
     setEndpoints([...endpoints, endpoint]);
-    setNewEndpoint({ name: '', method: 'GET', path: '' });
+    setNewEndpoint({
+      name: '',
+      method: 'GET',
+      path: ''
+    });
     setDialogOpen(false);
     toast({
       title: "Endpoint added",
-      description: `${endpoint.name} has been added successfully.`,
+      description: `${endpoint.name} has been added successfully.`
     });
   };
-
   const handleDelete = async (id: string) => {
-    const { error } = await supabase
-      .from('api_endpoints')
-      .delete()
-      .eq('id', id);
-
+    const {
+      error
+    } = await supabase.from('api_endpoints').delete().eq('id', id);
     if (error) {
       toast({
         title: "Error",
         description: error.message,
-        variant: "destructive",
+        variant: "destructive"
       });
       return;
     }
-
-    setEndpoints(endpoints.filter((e) => e.id !== id));
+    setEndpoints(endpoints.filter(e => e.id !== id));
     if (selectedEndpoint?.id === id) {
       setSelectedEndpoint(null);
     }
     toast({
       title: "Endpoint deleted",
-      description: "The endpoint has been removed.",
+      description: "The endpoint has been removed."
     });
   };
-
-  return (
-    <div className="grid grid-cols-12 gap-6">
+  return <div className="grid grid-cols-12 gap-6">
       {/* Left column - Endpoint list */}
       <div className="col-span-12 md:col-span-4">
         <Card className="h-full flex flex-col">
           <CardHeader>
             <CardTitle>Saved Endpoints</CardTitle>
-            <CardDescription>Click to test</CardDescription>
+            
           </CardHeader>
           <CardContent className="flex-1 flex flex-col">
-            {endpoints.length === 0 ? (
-              <p className="text-sm text-muted-foreground text-center py-8">
+            {endpoints.length === 0 ? <p className="text-sm text-muted-foreground text-center py-8">
                 No endpoints added yet. Click below to add one.
-              </p>
-            ) : (
-              <div className="space-y-2 mb-4">
-                {endpoints.map((endpoint) => (
-                  <div
-                    key={endpoint.id}
-                    className={`p-3 border rounded-lg cursor-pointer transition-colors hover:bg-muted ${
-                      selectedEndpoint?.id === endpoint.id ? 'bg-muted border-primary' : ''
-                    }`}
-                    onClick={() => setSelectedEndpoint(endpoint)}
-                  >
+              </p> : <div className="space-y-2 mb-4">
+                {endpoints.map(endpoint => <div key={endpoint.id} className={`p-3 border rounded-lg cursor-pointer transition-colors hover:bg-muted ${selectedEndpoint?.id === endpoint.id ? 'bg-muted border-primary' : ''}`} onClick={() => setSelectedEndpoint(endpoint)}>
                     <div className="flex items-start justify-between gap-2">
                       <div className="flex-1 min-w-0">
                         <p className="font-medium truncate">{endpoint.name}</p>
@@ -195,22 +167,15 @@ export function EndpointManager({ configId }: EndpointManagerProps) {
                           <span className="text-xs truncate block">{endpoint.path}</span>
                         </p>
                       </div>
-                      <Button
-                        size="icon"
-                        variant="ghost"
-                        className="h-8 w-8 shrink-0"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleDelete(endpoint.id);
-                        }}
-                      >
+                      <Button size="icon" variant="ghost" className="h-8 w-8 shrink-0" onClick={e => {
+                  e.stopPropagation();
+                  handleDelete(endpoint.id);
+                }}>
                         <Trash2 className="h-4 w-4" />
                       </Button>
                     </div>
-                  </div>
-                ))}
-              </div>
-            )}
+                  </div>)}
+              </div>}
             
             <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
               <DialogTrigger asChild>
@@ -229,20 +194,18 @@ export function EndpointManager({ configId }: EndpointManagerProps) {
                 <div className="space-y-4 py-4">
                   <div className="space-y-2">
                     <Label htmlFor="dialog-name">Name</Label>
-                    <Input
-                      id="dialog-name"
-                      placeholder="Get Assessments"
-                      value={newEndpoint.name}
-                      onChange={(e) => setNewEndpoint({ ...newEndpoint, name: e.target.value })}
-                    />
+                    <Input id="dialog-name" placeholder="Get Assessments" value={newEndpoint.name} onChange={e => setNewEndpoint({
+                    ...newEndpoint,
+                    name: e.target.value
+                  })} />
                   </div>
 
                   <div className="space-y-2">
                     <Label htmlFor="dialog-method">Method</Label>
-                    <Select
-                      value={newEndpoint.method}
-                      onValueChange={(value: any) => setNewEndpoint({ ...newEndpoint, method: value })}
-                    >
+                    <Select value={newEndpoint.method} onValueChange={(value: any) => setNewEndpoint({
+                    ...newEndpoint,
+                    method: value
+                  })}>
                       <SelectTrigger id="dialog-method">
                         <SelectValue />
                       </SelectTrigger>
@@ -257,12 +220,10 @@ export function EndpointManager({ configId }: EndpointManagerProps) {
 
                   <div className="space-y-2">
                     <Label htmlFor="dialog-path">Path</Label>
-                    <Input
-                      id="dialog-path"
-                      placeholder="/assessments"
-                      value={newEndpoint.path}
-                      onChange={(e) => setNewEndpoint({ ...newEndpoint, path: e.target.value })}
-                    />
+                    <Input id="dialog-path" placeholder="/assessments" value={newEndpoint.path} onChange={e => setNewEndpoint({
+                    ...newEndpoint,
+                    path: e.target.value
+                  })} />
                   </div>
 
                   <Button onClick={handleAdd} className="w-full">
@@ -278,16 +239,11 @@ export function EndpointManager({ configId }: EndpointManagerProps) {
 
       {/* Right column - API Tester */}
       <div className="col-span-12 md:col-span-8">
-        {selectedEndpoint ? (
-          <ApiTester endpoint={selectedEndpoint} configId={configId} />
-        ) : (
-          <Card className="h-full">
+        {selectedEndpoint ? <ApiTester endpoint={selectedEndpoint} configId={configId} /> : <Card className="h-full">
             <CardContent className="flex items-center justify-center h-full min-h-[400px]">
               <p className="text-muted-foreground">Select an endpoint to test</p>
             </CardContent>
-          </Card>
-        )}
+          </Card>}
       </div>
-    </div>
-  );
+    </div>;
 }

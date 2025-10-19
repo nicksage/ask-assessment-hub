@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Trash2, Plus, Play } from 'lucide-react';
+import { Trash2, Plus } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { ApiTester } from './ApiTester';
 
@@ -126,60 +126,72 @@ export function EndpointManager() {
         </CardContent>
       </Card>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Saved Endpoints</CardTitle>
-          <CardDescription>Click "Test" to send a request and analyze the response</CardDescription>
-        </CardHeader>
-        <CardContent>
-          {endpoints.length === 0 ? (
-            <p className="text-sm text-muted-foreground text-center py-8">
-              No endpoints added yet. Add one above to get started.
-            </p>
-          ) : (
-            <div className="space-y-2">
-              {endpoints.map((endpoint) => (
-                <div
-                  key={endpoint.id}
-                  className="flex items-center justify-between p-3 border rounded-lg"
-                >
-                  <div className="flex-1">
-                    <p className="font-medium">{endpoint.name}</p>
-                    <p className="text-sm text-muted-foreground">
-                      <span className="font-mono bg-muted px-1 rounded">{endpoint.method}</span>{' '}
-                      {endpoint.path}
-                    </p>
-                  </div>
-                  <div className="flex gap-2">
-                    <Button
-                      size="sm"
-                      variant="outline"
+      <div className="grid grid-cols-12 gap-6">
+        {/* Left column - Endpoint list */}
+        <div className="col-span-12 md:col-span-4">
+          <Card className="h-full">
+            <CardHeader>
+              <CardTitle>Saved Endpoints</CardTitle>
+              <CardDescription>Click to test</CardDescription>
+            </CardHeader>
+            <CardContent>
+              {endpoints.length === 0 ? (
+                <p className="text-sm text-muted-foreground text-center py-8">
+                  No endpoints added yet. Add one above to get started.
+                </p>
+              ) : (
+                <div className="space-y-2">
+                  {endpoints.map((endpoint) => (
+                    <div
+                      key={endpoint.id}
+                      className={`p-3 border rounded-lg cursor-pointer transition-colors hover:bg-muted ${
+                        selectedEndpoint?.id === endpoint.id ? 'bg-muted border-primary' : ''
+                      }`}
                       onClick={() => setSelectedEndpoint(endpoint)}
                     >
-                      <Play className="h-4 w-4 mr-1" />
-                      Test
-                    </Button>
-                    <Button
-                      size="sm"
-                      variant="destructive"
-                      onClick={() => handleDelete(endpoint.id)}
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </Button>
-                  </div>
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="flex-1 min-w-0">
+                          <p className="font-medium truncate">{endpoint.name}</p>
+                          <p className="text-sm text-muted-foreground">
+                            <span className="font-mono bg-background px-1 rounded text-xs">
+                              {endpoint.method}
+                            </span>{' '}
+                            <span className="text-xs truncate block">{endpoint.path}</span>
+                          </p>
+                        </div>
+                        <Button
+                          size="icon"
+                          variant="ghost"
+                          className="h-8 w-8 shrink-0"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleDelete(endpoint.id);
+                          }}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    </div>
+                  ))}
                 </div>
-              ))}
-            </div>
-          )}
-        </CardContent>
-      </Card>
+              )}
+            </CardContent>
+          </Card>
+        </div>
 
-      {selectedEndpoint && (
-        <ApiTester
-          endpoint={selectedEndpoint}
-          onClose={() => setSelectedEndpoint(null)}
-        />
-      )}
+        {/* Right column - API Tester */}
+        <div className="col-span-12 md:col-span-8">
+          {selectedEndpoint ? (
+            <ApiTester endpoint={selectedEndpoint} />
+          ) : (
+            <Card className="h-full">
+              <CardContent className="flex items-center justify-center h-full min-h-[400px]">
+                <p className="text-muted-foreground">Select an endpoint to test</p>
+              </CardContent>
+            </Card>
+          )}
+        </div>
+      </div>
     </div>
   );
 }

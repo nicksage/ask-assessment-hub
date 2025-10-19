@@ -1,17 +1,16 @@
 import { useState } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Loader2, X } from 'lucide-react';
+import { Loader2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { ApiEndpoint } from './EndpointManager';
 import { DynamicDataTable } from './DynamicDataTable';
 
 interface ApiTesterProps {
   endpoint: ApiEndpoint;
-  onClose: () => void;
 }
 
-export function ApiTester({ endpoint, onClose }: ApiTesterProps) {
+export function ApiTester({ endpoint }: ApiTesterProps) {
   const [loading, setLoading] = useState(false);
   const [response, setResponse] = useState<any>(null);
   const [error, setError] = useState<string | null>(null);
@@ -44,16 +43,28 @@ export function ApiTester({ endpoint, onClose }: ApiTesterProps) {
         },
       });
 
-      if (!res.ok) {
-        throw new Error(`HTTP ${res.status}: ${res.statusText}`);
+      let data;
+      try {
+        data = await res.json();
+      } catch {
+        data = { error: 'Failed to parse response as JSON' };
       }
 
-      const data = await res.json();
-      setResponse(data);
-      toast({
-        title: "Request successful",
-        description: `${endpoint.method} ${endpoint.path}`,
-      });
+      if (!res.ok) {
+        setError(`HTTP ${res.status}: ${res.statusText}`);
+        setResponse(data);
+        toast({
+          title: "Request failed",
+          description: `${endpoint.method} ${endpoint.path} - ${res.status}`,
+          variant: "destructive",
+        });
+      } else {
+        setResponse(data);
+        toast({
+          title: "Request successful",
+          description: `${endpoint.method} ${endpoint.path}`,
+        });
+      }
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Unknown error';
       setError(message);
@@ -70,18 +81,11 @@ export function ApiTester({ endpoint, onClose }: ApiTesterProps) {
   return (
     <Card>
       <CardHeader>
-        <div className="flex items-center justify-between">
-          <div>
-            <CardTitle>API Tester: {endpoint.name}</CardTitle>
-            <CardDescription>
-              <span className="font-mono bg-muted px-1 rounded">{endpoint.method}</span>{' '}
-              {endpoint.path}
-            </CardDescription>
-          </div>
-          <Button variant="ghost" size="icon" onClick={onClose}>
-            <X className="h-4 w-4" />
-          </Button>
-        </div>
+        <CardTitle>API Tester: {endpoint.name}</CardTitle>
+        <CardDescription>
+          <span className="font-mono bg-muted px-1 rounded">{endpoint.method}</span>{' '}
+          {endpoint.path}
+        </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
         <Button onClick={handleSendRequest} disabled={loading} className="w-full">

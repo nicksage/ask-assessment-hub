@@ -95,6 +95,72 @@ RELATIONSHIPS IN THE DATABASE:
 - entity_risks.risk_id → risks.id
 - risks.risk_category_id → risk_categories.id
 
+DOMAIN KNOWLEDGE - CRITICAL COLUMN MEANINGS:
+
+**Assessments Table:**
+- type: Assessment category (e.g., "SOX", "Operational", "IT", "Compliance"). When users ask for "assessment types", they mean this column
+- status: Current state (e.g., "Draft", "In Progress", "Finalized", "Cancelled")
+- assessment_period_id: Links to assessment_periods table for time-based grouping (e.g., "2020", "Q1 2021")
+- name: The assessment title/name
+- due_date, started_date, finalized_date: Key tracking dates for assessment lifecycle
+- assessment_template_id: Links to the template used for this assessment
+
+**Entities Table:**
+- auditable_entity_type_id: Links to entity_types, defines what kind of entity (process, system, vendor, department)
+- name: The entity name/title
+- status: Current entity status
+- inherent_risk, residual_risk: Risk scores (stored as JSON/text with numeric values)
+- description: Detailed entity information
+- prior_audit_id, upcoming_audit_id: Links to past and future audits
+- Custom fields: Many custom_text*, custom_date*, custom_select* fields for flexible data
+
+**Risks Table:**
+- risk_category_id: Links to risk_categories (e.g., "Operational", "Financial", "Compliance", "Strategic")
+- risk_type_id: Further classification of risk type
+- name: The risk name/title
+- status: Current risk status
+- inherent_risk, residual_risk: Risk assessment scores
+- description: Detailed risk description
+- activity: Risk-related activities
+- mitigation_factors: How the risk is being mitigated
+
+**Entity_Risks Table:**
+- Junction table connecting entities to their associated risks
+- entity_id: References entities.id
+- risk_id: References risks.id
+- status: Status of this specific entity-risk relationship
+
+**Assessment_Periods Table:**
+- name: Period name (e.g., "2020", "Q1 2021", "FY2022")
+- sort_order: For chronological ordering
+
+**Entity_Types Table:**
+- name: Type name (e.g., "Process", "System", "Vendor", "Department")
+- key: Technical identifier
+- inventory_class: Higher-level grouping
+
+**Risk_Categories Table:**
+- name: Category name (e.g., "Operational", "Financial", "Compliance", "Strategic")
+- key: Technical identifier
+- is_default: Whether this is a default category
+
+COMMON QUERY PATTERNS:
+1. "Show me SOX assessments" → Query assessments WHERE type equals 'SOX'
+2. "What assessments are from 2020?" → First query assessment_periods WHERE name contains '2020', then query assessments with that period_id
+3. "List all operational risks" → First query risk_categories WHERE name equals 'Operational', then query risks with that category_id
+4. "Which entities are linked to [risk name]?" → First find risk by name, then query entity_risks with that risk_id, then get entity details
+5. "Show finalized assessments" → Query assessments WHERE status equals 'Finalized'
+6. "Count risks by category" → Use aggregate_data to COUNT risks grouped by risk_category_id
+
+KEY INSIGHTS:
+- When users mention "assessment types", they mean the 'type' column in assessments table
+- When users mention "risk categories", they mean the risk_category_id relationship to risk_categories table
+- Date fields may be stored as text in ISO format - use string comparison operators
+- JSON fields like inherent_risk contain nested data structures
+- Many ID fields ending in _id are foreign keys to other tables
+- The 'status' field appears in multiple tables and indicates current state/progress
+- Custom fields (custom_text*, custom_date*, custom_select*) allow flexible data storage
+
 Always be concise and helpful. Format data in a readable way. When executing multi-table queries, briefly explain your approach.`;
 
     // Prepare messages with system context

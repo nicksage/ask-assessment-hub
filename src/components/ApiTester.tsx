@@ -112,7 +112,7 @@ export function ApiTester({ endpoint, configId }: ApiTesterProps) {
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
-        <Button onClick={handleSendRequest} disabled={loading} className="w-full">
+        <Button onClick={handleSendRequest} disabled={loading} className="w-1/4">
           {loading ? (
             <>
               <Loader2 className="mr-2 h-4 w-4 animate-spin" />

@@ -85,12 +85,56 @@ export type Database = {
           },
         ]
       }
+      api_schema_mappings: {
+        Row: {
+          column_mappings: Json
+          created_at: string | null
+          endpoint_id: string | null
+          id: string
+          last_synced_at: string | null
+          table_name: string
+          updated_at: string | null
+          user_id: string
+        }
+        Insert: {
+          column_mappings: Json
+          created_at?: string | null
+          endpoint_id?: string | null
+          id?: string
+          last_synced_at?: string | null
+          table_name: string
+          updated_at?: string | null
+          user_id: string
+        }
+        Update: {
+          column_mappings?: Json
+          created_at?: string | null
+          endpoint_id?: string | null
+          id?: string
+          last_synced_at?: string | null
+          table_name?: string
+          updated_at?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "api_schema_mappings_endpoint_id_fkey"
+            columns: ["endpoint_id"]
+            isOneToOne: false
+            referencedRelation: "api_endpoints"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      create_user_table_from_schema: {
+        Args: { p_columns: Json; p_table_name: string; p_user_id: string }
+        Returns: Json
+      }
     }
     Enums: {
       [_ in never]: never

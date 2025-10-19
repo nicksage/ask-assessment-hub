@@ -66,9 +66,9 @@ Deno.serve(async (req) => {
 
     if (learningsError) {
       console.error('Error fetching learnings:', learningsError);
-    } else {
-      console.log(`Found ${learnings?.length || 0} learned patterns`);
     }
+
+    console.log(`Found ${learnings?.length || 0} learned patterns`);
 
     // Build schema registry
     const registry = {
@@ -120,7 +120,7 @@ Deno.serve(async (req) => {
       relationships: detectRelationships(mappings || []),
       learned_patterns: {
         description: 'Previously confirmed query interpretations for this user',
-        patterns: (learnings || []).map(l => ({
+        patterns: (learnings || []).map((l: any) => ({
           user_asks: l.query_pattern,
           correct_interpretation: l.interpretation,
           tables_used: l.tables_involved || [],

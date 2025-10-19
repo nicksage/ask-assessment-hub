@@ -41,25 +41,25 @@ Deno.serve(async (req) => {
     const { data: schemaData, error: schemaError } = await supabase.functions.invoke('get-schema-registry');
     
     let schemaContext = '';
+    let learnedContext = '';
     if (!schemaError && schemaData) {
       schemaContext = `Available database tables and their schemas:\n${JSON.stringify(schemaData, null, 2)}`;
+      
+      // Add learned patterns to context if available
+      if (schemaData.learned_patterns && schemaData.learned_patterns.patterns && schemaData.learned_patterns.patterns.length > 0) {
+        learnedContext = `\n\nLEARNED QUERY PATTERNS (use these as reference for similar queries):
+${schemaData.learned_patterns.patterns.map((p: any) => 
+  `- When user asks: "${p.user_asks}"
+    Correct interpretation: ${p.correct_interpretation}
+    Tables used: ${JSON.stringify(p.tables_used)}
+    Confidence: ${(p.confidence * 100).toFixed(0)}% | Used ${p.usage_count} times`
+).join('\n')}`;
+      }
     }
 
     const LOVABLE_API_KEY = Deno.env.get('LOVABLE_API_KEY');
     if (!LOVABLE_API_KEY) {
       throw new Error('LOVABLE_API_KEY not configured');
-    }
-
-    // Add learned patterns to schema context
-    let learnedContext = '';
-    if (schemaData.learned_patterns && schemaData.learned_patterns.patterns && schemaData.learned_patterns.patterns.length > 0) {
-      learnedContext = `\n\nLEARNED QUERY PATTERNS (use these as reference for similar queries):
-${schemaData.learned_patterns.patterns.map((p: any) => 
-  `- When user asks: "${p.user_asks}"
-    Correct interpretation: ${p.correct_interpretation}
-    Tables used: ${p.tables_used.join(', ')}
-    Confidence: ${(p.confidence * 100).toFixed(0)}% | Used ${p.usage_count} times`
-).join('\n')}`;
     }
 
     // System prompt with schema context
@@ -72,8 +72,8 @@ Before executing any queries, ALWAYS explain your interpretation in this format:
 "I understand you want to [interpretation]. I'll [approach]."
 
 Example:
-User: "Show me all entity risk assessments"
-AI: "I understand you want to see all assessments where the type is 'EntityRisk'. I'll query the assessments table with that filter. Let me do that now..."
+User: "Show me all products"
+AI: "I understand you want to see all entities where the entity type is 'Product'. I'll first query the entity_types table to find the ID for 'Product', then query the entities table with that type ID. Let me do that now..."
 
 QUERY CAPABILITIES:
 1. Single-table queries with filtering, sorting, and pagination
@@ -371,19 +371,21 @@ Always be concise and helpful. Format data in a readable way. When executing mul
     const finalMessage = currentResponse.choices[0].message.content;
     
     console.log(`Query completed after ${iterationCount} iteration(s)`);
-
-    // Detect if this is a confirmation/correction message
+    
+    // Detect and store learning patterns from user feedback
     if (messages.length >= 2) {
       const lastUserMessage = messages[messages.length - 1].content.toLowerCase();
-      const isConfirmation = /^(yes|correct|right|exactly|that's right|perfect|thanks|thank you)/i.test(lastUserMessage);
+      const isConfirmation = /^(yes|correct|right|exactly|that'?s right|perfect|thanks?|thank you)/i.test(lastUserMessage);
       const isCorrection = /(no|not|actually|instead|i meant|wrong)/i.test(lastUserMessage);
-
-      if (isConfirmation && messages.length >= 2) {
-        // Extract and store learning from confirmed interpretation
-        await storeQueryLearning(user.id, messages, conversationHistory, 'confirmed', supabase);
-      } else if (isCorrection) {
-        // Store correction for learning
-        await storeQueryLearning(user.id, messages, conversationHistory, 'corrected', supabase);
+      
+      if (messages.length >= 3 && (isConfirmation || isCorrection)) {
+        // Get the query that was just confirmed/corrected
+        const userQuery = messages[messages.length - 2]?.content;
+        const aiInterpretation = conversationHistory.find(m => m.role === 'assistant' && m.content)?.content;
+        
+        if (userQuery && aiInterpretation) {
+          await storeQueryLearning(supabase, user.id, userQuery, aiInterpretation, isConfirmation ? 'confirmed' : 'corrected');
+        }
       }
     }
 
@@ -409,58 +411,40 @@ Always be concise and helpful. Format data in a readable way. When executing mul
   }
 });
 
-// Helper functions for learning storage
+// Helper function to extract table names from AI interpretation text
+function extractTablesFromInterpretation(interpretation: string): string[] {
+  const tablePattern = /\b(assessments|entities|risks|entity_risks|assessment_periods|entity_types|risk_categories)\b/gi;
+  const matches = interpretation.match(tablePattern);
+  return matches ? [...new Set(matches.map(t => t.toLowerCase()))] : [];
+}
+
+// Helper function to store query learning patterns
 async function storeQueryLearning(
+  supabase: any,
   userId: string,
-  messages: Message[],
-  conversationHistory: Message[],
-  confirmationType: string,
-  supabase: any
+  queryPattern: string,
+  interpretation: string,
+  confirmationType: string
 ) {
   try {
-    // Find the user's original query (look for the last user message before the final one)
-    let originalQuery = '';
-    let interpretation = '';
+    console.log(`Storing learning: ${confirmationType} - "${queryPattern}"`);
     
-    // Get the second-to-last user message as the original query
-    const userMessages = messages.filter(m => m.role === 'user');
-    if (userMessages.length >= 2) {
-      originalQuery = userMessages[userMessages.length - 2].content;
-    } else if (userMessages.length === 1) {
-      originalQuery = userMessages[0].content;
-    }
-
-    // Find the AI's interpretation (look for assistant messages in conversation history)
-    const assistantMessages = conversationHistory.filter(m => m.role === 'assistant' && m.content);
-    if (assistantMessages.length > 0) {
-      interpretation = assistantMessages[assistantMessages.length - 1].content || '';
-    }
-
-    if (!originalQuery || !interpretation) {
-      console.log('Could not extract query or interpretation for learning');
-      return;
-    }
-
-    // Extract tables mentioned in the interpretation
     const tablesInvolved = extractTablesFromInterpretation(interpretation);
-
-    console.log('Storing learning:', { originalQuery, interpretation, tablesInvolved, confirmationType });
-
+    
     // Check if similar pattern exists
-    const { data: existing, error: selectError } = await supabase
+    const { data: existing, error: existingError } = await supabase
       .from('query_learnings')
       .select('*')
       .eq('user_id', userId)
-      .ilike('query_pattern', `%${originalQuery.substring(0, 50)}%`)
+      .ilike('query_pattern', `%${queryPattern.substring(0, 50)}%`)
       .maybeSingle();
-
-    if (selectError) {
-      console.error('Error checking existing learning:', selectError);
-      return;
+    
+    if (existingError) {
+      console.error('Error checking existing learning:', existingError);
     }
-
+    
     if (existing) {
-      // Update existing learning
+      // Update existing learning - increase confidence and usage
       const newConfidence = Math.min(existing.confidence_score + 0.1, 1.0);
       const { error: updateError } = await supabase
         .from('query_learnings')
@@ -470,11 +454,11 @@ async function storeQueryLearning(
           updated_at: new Date().toISOString()
         })
         .eq('id', existing.id);
-
+      
       if (updateError) {
         console.error('Error updating learning:', updateError);
       } else {
-        console.log('Updated existing learning with new confidence:', newConfidence);
+        console.log(`Updated existing learning. New confidence: ${newConfidence}, usage: ${existing.usage_count + 1}`);
       }
     } else {
       // Create new learning
@@ -482,40 +466,20 @@ async function storeQueryLearning(
         .from('query_learnings')
         .insert({
           user_id: userId,
-          query_pattern: originalQuery,
+          query_pattern: queryPattern,
           interpretation: interpretation,
           tables_involved: tablesInvolved,
           confirmation_type: confirmationType,
-          confidence_score: 0.7,
-          original_query: originalQuery
+          confidence_score: confirmationType === 'confirmed' ? 0.7 : 0.5
         });
-
+      
       if (insertError) {
         console.error('Error inserting learning:', insertError);
       } else {
-        console.log('Created new learning entry');
+        console.log('Created new learning pattern');
       }
     }
   } catch (error) {
     console.error('Error in storeQueryLearning:', error);
   }
-}
-
-function extractTablesFromInterpretation(interpretation: string): string[] {
-  const tables = [];
-  // List of known tables from the schema
-  const knownTables = [
-    'assessments', 'entities', 'risks', 'entity_risks', 
-    'assessment_periods', 'entity_types', 'risk_categories'
-  ];
-  
-  const lowerInterpretation = interpretation.toLowerCase();
-  
-  for (const table of knownTables) {
-    if (lowerInterpretation.includes(table)) {
-      tables.push(table);
-    }
-  }
-  
-  return [...new Set(tables)]; // Remove duplicates
 }

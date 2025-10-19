@@ -263,7 +263,7 @@ Always be concise and helpful. Format data in a readable way. When executing mul
                   },
                   limit: {
                     type: 'number',
-                    description: 'Maximum number of records to return (default: 100)'
+                    description: 'Maximum number of records to return (default: 1000)'
                   }
                 },
                 required: ['type_name']
@@ -284,7 +284,7 @@ Always be concise and helpful. Format data in a readable way. When executing mul
                   },
                   limit: {
                     type: 'number',
-                    description: 'Maximum number of records to return (default: 100)'
+                    description: 'Maximum number of records to return (default: 1000)'
                   }
                 },
                 required: ['category_name']
@@ -329,7 +329,7 @@ Always be concise and helpful. Format data in a readable way. When executing mul
                   },
                   limit: {
                     type: 'number',
-                    description: 'Maximum number of entities to return (default: 100)'
+                    description: 'Maximum number of entities to return (default: 1000)'
                   }
                 }
               }

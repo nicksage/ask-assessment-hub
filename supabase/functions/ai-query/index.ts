@@ -98,7 +98,7 @@ RELATIONSHIPS IN THE DATABASE:
 DOMAIN KNOWLEDGE - CRITICAL COLUMN MEANINGS:
 
 **Assessments Table:**
-- type: Assessment category (e.g., "SOX", "Operational", "IT", "Compliance"). When users ask for "assessment types", they mean this column
+- type: Assessment type (e.g., "Risk Assessment" = "Risk", "Entity Risk Assessment" = "EntityRisk", "RCSA" = "RiskControl"). When users ask for "assessment types", they mean this column
 - status: Current state (e.g., "Draft", "In Progress", "Finalized", "Cancelled")
 - assessment_period_id: Links to assessment_periods table for time-based grouping (e.g., "2020", "Q1 2021")
 - name: The assessment title/name
@@ -109,7 +109,6 @@ DOMAIN KNOWLEDGE - CRITICAL COLUMN MEANINGS:
 - auditable_entity_type_id: Links to entity_types, defines what kind of entity (process, system, vendor, department)
 - name: The entity name/title
 - status: Current entity status
-- inherent_risk, residual_risk: Risk scores (stored as JSON/text with numeric values)
 - description: Detailed entity information
 - prior_audit_id, upcoming_audit_id: Links to past and future audits
 - Custom fields: Many custom_text*, custom_date*, custom_select* fields for flexible data
@@ -119,10 +118,7 @@ DOMAIN KNOWLEDGE - CRITICAL COLUMN MEANINGS:
 - risk_type_id: Further classification of risk type
 - name: The risk name/title
 - status: Current risk status
-- inherent_risk, residual_risk: Risk assessment scores
 - description: Detailed risk description
-- activity: Risk-related activities
-- mitigation_factors: How the risk is being mitigated
 
 **Entity_Risks Table:**
 - Junction table connecting entities to their associated risks

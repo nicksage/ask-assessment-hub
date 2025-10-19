@@ -108,18 +108,21 @@ Deno.serve(async (req) => {
       return record;
     });
 
-    console.log('Inserting records:', JSON.stringify(recordsToInsert, null, 2));
+    console.log('Upserting records:', JSON.stringify(recordsToInsert, null, 2));
 
-    // Insert the data into the table
-    const { data: insertedData, error: insertError } = await supabase
+    // Upsert the data into the table (insert new, update existing)
+    const { data: upsertedData, error: upsertError } = await supabase
       .from(tableName)
-      .insert(recordsToInsert)
+      .upsert(recordsToInsert, {
+        onConflict: 'user_id,source_endpoint_id,id',
+        ignoreDuplicates: false // Update existing records
+      })
       .select();
 
-    if (insertError) {
-      console.error('Error inserting data:', insertError);
+    if (upsertError) {
+      console.error('Error upserting data:', upsertError);
       return new Response(
-        JSON.stringify({ error: 'Failed to insert data', details: insertError }),
+        JSON.stringify({ error: 'Failed to upsert data', details: upsertError }),
         { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
@@ -134,13 +137,13 @@ Deno.serve(async (req) => {
       console.warn('Warning: Failed to update last_synced_at:', updateError);
     }
 
-    console.log('Successfully inserted', insertedData?.length || 0, 'records');
+    console.log('Successfully upserted', upsertedData?.length || 0, 'records');
 
     return new Response(
       JSON.stringify({ 
         success: true, 
-        recordsInserted: insertedData?.length || 0,
-        message: 'Data synced successfully!'
+        recordsProcessed: upsertedData?.length || 0,
+        message: 'Data synced successfully! (new records added, existing records updated)'
       }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );

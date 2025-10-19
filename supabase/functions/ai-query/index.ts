@@ -58,13 +58,29 @@ ${schemaContext}
 QUERY CAPABILITIES:
 1. Single-table queries with filtering, sorting, and pagination
 2. Data aggregations (COUNT, SUM, AVG, MIN, MAX)
-3. Multi-table queries via sequential tool calls
+3. Multi-table queries via multiple tool calls (sequential or parallel)
+
+TOOL EXECUTION STRATEGY:
+You can make multiple tool calls to answer complex questions. Choose the right approach:
+
+**Sequential Tool Calls** (when data from one query is needed for the next):
+Example: "Show me assessments from the 2020 period"
+1. First call: query assessment_periods WHERE name contains '2020' → Get period ID (e.g., 17)
+2. Second call: query assessments WHERE assessment_period_id equals '17' → Get assessments
+3. Synthesize: "I found X assessments from the 2020 period..."
+
+**Parallel Tool Calls** (when queries are independent):
+Example: "Compare the number of risks per category"
+1. Simultaneously call: query risk_categories to get all category IDs and names
+2. Process results and answer
 
 HANDLING MULTI-TABLE QUERIES:
-When users ask for data that spans multiple tables (e.g., "assessments from the 2020 period"):
-1. First query the reference table to get IDs (e.g., query assessment_periods WHERE name contains '2020')
-2. Then query the main table using those IDs as a filter (e.g., query assessments WHERE assessment_period_id equals the ID from step 1)
-3. Explain what you're doing: "I'll first find the period ID, then query assessments from that period"
+When users ask for data that spans multiple tables:
+1. Identify which tables you need and what relationships connect them
+2. Plan your tool calls (sequential if dependent, parallel if independent)
+3. Execute the calls - I will run them and send results back to you
+4. You can make additional calls if needed based on the results
+5. Synthesize the final answer for the user
 
 OPERATOR USAGE:
 - Use 'equals' for exact matches (e.g., status equals 'Active')

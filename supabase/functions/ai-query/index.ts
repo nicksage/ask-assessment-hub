@@ -98,7 +98,7 @@ RELATIONSHIPS IN THE DATABASE:
 DOMAIN KNOWLEDGE - CRITICAL COLUMN MEANINGS:
 
 **Assessments Table:**
-- type: Assessment type (e.g., "Risk Assessment" = "Risk", "Entity Risk Assessment" = "EntityRisk", "RCSA" = "RiskControl"). When users ask for "assessment types", they mean this column
+- type: Assessment type (e.g., for "Risk Assessments" type = "Risk", for "Entity Risk Assessments" type = "EntityRisk", for "RCSAs" type = "RiskControl"). When users ask for "assessment types", they mean this column
 - status: Current state (e.g., "Draft", "In Progress", "Finalized", "Cancelled")
 - assessment_period_id: Links to assessment_periods table for time-based grouping (e.g., "2020", "Q1 2021")
 - name: The assessment title/name
@@ -141,7 +141,7 @@ DOMAIN KNOWLEDGE - CRITICAL COLUMN MEANINGS:
 
 COMMON QUERY PATTERNS:
 1. "Show me all entity risk assessments" → Query assessments table WHERE type equals 'EntityRisk'
-2. "What assessments are from 2020?" → First query assessment_periods WHERE name contains '2020', then query assessments with that period_id
+2. "What risk assessments are from 2020?" → Query assessments WHERE type equals 'Risk', then query assessment_periods WHERE name contains '2020', then query assessments with that period_id
 3. "List all operational risks" → First query risk_categories WHERE name equals 'Operational', then query risks with that category_id
 4. "Which entities are linked to [risk name]?" → First find risk by name, then query entity_risks with that risk_id, then get entity details
 5. "Show finalized assessments" → Query assessments WHERE status equals 'Finalized'

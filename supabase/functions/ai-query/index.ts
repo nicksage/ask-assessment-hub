@@ -6,8 +6,10 @@ const corsHeaders = {
 };
 
 interface Message {
-  role: 'user' | 'assistant' | 'system';
+  role: 'user' | 'assistant' | 'system' | 'tool';
   content: string;
+  tool_calls?: any[];
+  tool_call_id?: string;
 }
 
 Deno.serve(async (req) => {
@@ -87,17 +89,8 @@ Always be concise and helpful. Format data in a readable way. When executing mul
 
     console.log('Calling Lovable AI...');
 
-    // Call Lovable AI with tool definitions
-    const aiResponse = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${LOVABLE_API_KEY}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        model: 'google/gemini-2.5-flash',
-        messages: aiMessages,
-        tools: [
+    // Define tools array for reuse in iterations
+    const tools = [
           {
             type: 'function',
             function: {
@@ -170,7 +163,19 @@ Always be concise and helpful. Format data in a readable way. When executing mul
               }
             }
           }
-        ],
+        ];
+
+    // Call Lovable AI with tool definitions
+    const aiResponse = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${LOVABLE_API_KEY}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        model: 'google/gemini-2.5-flash',
+        messages: aiMessages,
+        tools: tools,
         tool_choice: 'auto'
       }),
     });
@@ -206,7 +211,7 @@ Always be concise and helpful. Format data in a readable way. When executing mul
       
       // Execute ALL tool calls in parallel
       const toolResults = await Promise.all(
-        toolCalls.map(async (toolCall) => {
+        toolCalls.map(async (toolCall: any) => {
           const functionName = toolCall.function.name;
           const functionArgs = JSON.parse(toolCall.function.arguments);
           

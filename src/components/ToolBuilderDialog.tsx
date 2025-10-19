@@ -91,6 +91,12 @@ export const ToolBuilderDialog = ({
       setLoading(true);
       setStep(3);
 
+      // Get current user
+      const { data: { user }, error: userError } = await supabase.auth.getUser();
+      if (userError || !user) {
+        throw new Error("Not authenticated");
+      }
+
       // Generate code
       const { data: codeData, error: codeError } = await supabase.functions.invoke(
         "generate-tool-code",
@@ -108,6 +114,7 @@ export const ToolBuilderDialog = ({
 
       // Save to database
       const { error: dbError } = await supabase.from("custom_tools").insert({
+        user_id: user.id,
         name: toolDefinition.function_name,
         display_name:
           toolDefinition.function_name
@@ -119,7 +126,7 @@ export const ToolBuilderDialog = ({
         tool_schema: toolDefinition.tool_schema,
         edge_function_code: codeData.edge_function_code,
         status: "active",
-      } as any);
+      });
 
       if (dbError) throw dbError;
 

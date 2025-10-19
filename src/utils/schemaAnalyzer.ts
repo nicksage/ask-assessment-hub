@@ -1,5 +1,5 @@
-// Reserved column names that conflict with system-generated columns
-const RESERVED_COLUMNS = ['id', 'user_id', 'source_endpoint_id', 'created_at', 'updated_at'];
+// System-generated column names that won't conflict with API data
+const RESERVED_COLUMNS = ['record_id', 'user_id', 'source_endpoint_id', 'synced_at', 'record_updated_at'];
 
 export interface ColumnDefinition {
   name: string;
@@ -84,15 +84,11 @@ export function analyzeSchema(data: any, endpointName: string): SchemaAnalysis {
     // Skip internal fields
     if (key.startsWith('_')) return;
     
-    let sanitizedName = key
+    const sanitizedName = key
       .replace(/[^a-z0-9_]/gi, '_')
       .toLowerCase();
     
-    // Check if it's a reserved column and rename it with 'api_' prefix
-    if (RESERVED_COLUMNS.includes(sanitizedName)) {
-      sanitizedName = `api_${sanitizedName}`;
-    }
-    
+    // No need to check for reserved columns anymore - system columns are renamed
     columns.push({
       name: sanitizedName,
       type: inferPostgresType(value),

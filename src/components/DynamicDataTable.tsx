@@ -41,18 +41,16 @@ export function DynamicDataTable({ data, endpoint }: DynamicDataTableProps) {
   return (
     <Card>
       <CardHeader>
-        <div className="flex items-center justify-between">
-          <CardTitle>Response Data</CardTitle>
-          <Button size="sm" variant="outline" onClick={handleAddToSchema} disabled={isCreating}>
-            <Database className="mr-2 h-4 w-4" />
-            Add to Schema
-          </Button>
-        </div>
+        <CardTitle>Response Data</CardTitle>
       </CardHeader>
-      <CardContent>
+      <CardContent className="space-y-4">
         <pre className="bg-muted p-4 rounded-lg overflow-auto max-h-96 text-sm">
           {JSON.stringify(data, null, 2)}
         </pre>
+        <Button size="sm" onClick={handleAddToSchema} disabled={isCreating} className="w-1/4">
+          <Database className="mr-2 h-4 w-4" />
+          Add to Schema
+        </Button>
       </CardContent>
 
       <AddSchemaDialog

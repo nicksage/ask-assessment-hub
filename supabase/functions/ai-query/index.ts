@@ -184,44 +184,65 @@ Always be concise and helpful. Format data in a readable way. When executing mul
     const aiResult = await aiResponse.json();
     console.log('AI response:', JSON.stringify(aiResult, null, 2));
 
-    const choice = aiResult.choices[0];
-    
-    // Check if AI wants to use tools
-    if (choice.message.tool_calls && choice.message.tool_calls.length > 0) {
-      const toolCall = choice.message.tool_calls[0];
-      const functionName = toolCall.function.name;
-      const functionArgs = JSON.parse(toolCall.function.arguments);
+    // Implement iterative tool call loop for multi-step queries
+    const conversationHistory = [...aiMessages];
+    let currentResponse = aiResult;
+    let iterationCount = 0;
+    const MAX_ITERATIONS = 5; // Prevent infinite loops
+    let allToolResults: any[] = [];
 
-      console.log(`Executing tool: ${functionName}`, functionArgs);
-
-      let toolResult;
+    while (
+      currentResponse.choices[0].message.tool_calls && 
+      currentResponse.choices[0].message.tool_calls.length > 0 &&
+      iterationCount < MAX_ITERATIONS
+    ) {
+      iterationCount++;
+      const toolCalls = currentResponse.choices[0].message.tool_calls;
       
-      if (functionName === 'query_data') {
-        const { data: queryData, error: queryError } = await supabase.functions.invoke('query-builder', {
-          body: functionArgs
-        });
-
-        if (queryError) {
-          toolResult = { error: queryError.message };
-        } else {
-          toolResult = queryData;
-        }
-      } else if (functionName === 'aggregate_data') {
-        const { data: analyticsData, error: analyticsError } = await supabase.functions.invoke('analytics-query', {
-          body: functionArgs
-        });
-
-        if (analyticsError) {
-          toolResult = { error: analyticsError.message };
-        } else {
-          toolResult = analyticsData;
-        }
-      }
-
-      console.log('Tool result:', JSON.stringify(toolResult, null, 2));
-
-      // Send tool result back to AI for final response
-      const finalResponse = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
+      console.log(`Iteration ${iterationCount}: Processing ${toolCalls.length} tool call(s)`);
+      
+      // Add AI's tool request to conversation history
+      conversationHistory.push(currentResponse.choices[0].message);
+      
+      // Execute ALL tool calls in parallel
+      const toolResults = await Promise.all(
+        toolCalls.map(async (toolCall) => {
+          const functionName = toolCall.function.name;
+          const functionArgs = JSON.parse(toolCall.function.arguments);
+          
+          console.log(`Executing tool: ${functionName}`, functionArgs);
+          
+          let result;
+          if (functionName === 'query_data') {
+            const { data: queryData, error: queryError } = await supabase.functions.invoke('query-builder', {
+              body: functionArgs
+            });
+            result = queryError ? { error: queryError.message } : queryData;
+          } else if (functionName === 'aggregate_data') {
+            const { data: analyticsData, error: analyticsError } = await supabase.functions.invoke('analytics-query', {
+              body: functionArgs
+            });
+            result = analyticsError ? { error: analyticsError.message } : analyticsData;
+          }
+          
+          console.log(`Tool result for ${functionName}:`, JSON.stringify(result, null, 2));
+          
+          // Store result for final response
+          allToolResults.push(result);
+          
+          return {
+            role: 'tool',
+            tool_call_id: toolCall.id,
+            content: JSON.stringify(result)
+          };
+        })
+      );
+      
+      // Add all tool results to conversation history
+      conversationHistory.push(...toolResults);
+      
+      // Send back to AI for next decision
+      const nextResponse = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${LOVABLE_API_KEY}`,
@@ -229,34 +250,31 @@ Always be concise and helpful. Format data in a readable way. When executing mul
         },
         body: JSON.stringify({
           model: 'google/gemini-2.5-flash',
-          messages: [
-            ...aiMessages,
-            choice.message,
-            {
-              role: 'tool',
-              tool_call_id: toolCall.id,
-              content: JSON.stringify(toolResult)
-            }
-          ]
+          messages: conversationHistory,
+          tools: tools // Keep tools available for next iteration
         }),
       });
-
-      const finalResult = await finalResponse.json();
-      const finalMessage = finalResult.choices[0].message.content;
-
-      return new Response(
-        JSON.stringify({ 
-          message: finalMessage,
-          data: toolResult
-        }),
-        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
+      
+      if (!nextResponse.ok) {
+        const errorText = await nextResponse.text();
+        console.error('Lovable AI error in iteration:', nextResponse.status, errorText);
+        throw new Error(`AI request failed in iteration ${iterationCount}: ${nextResponse.status}`);
+      }
+      
+      currentResponse = await nextResponse.json();
+      console.log(`Iteration ${iterationCount} complete. AI response:`, JSON.stringify(currentResponse.choices[0].message, null, 2));
     }
 
-    // No tool calls, return AI response directly
+    // After loop: AI has final answer (no more tool calls)
+    const finalMessage = currentResponse.choices[0].message.content;
+    
+    console.log(`Query completed after ${iterationCount} iteration(s)`);
+
     return new Response(
       JSON.stringify({ 
-        message: choice.message.content 
+        message: finalMessage,
+        data: allToolResults.length > 0 ? allToolResults : undefined,
+        iterations: iterationCount
       }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );

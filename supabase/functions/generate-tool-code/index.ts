@@ -44,9 +44,9 @@ Deno.serve(async (req) => {
       });
     }
 
-    const systemPrompt = `You are an expert at generating Supabase edge function code.
+    const systemPrompt = `You are an expert at generating database query logic for Supabase.
 
-Generate TypeScript code for a Supabase edge function that implements this tool:
+Generate JavaScript/TypeScript code that implements this tool:
 
 Tool Details:
 ${JSON.stringify(tool_definition, null, 2)}
@@ -55,18 +55,48 @@ Database Schema:
 ${JSON.stringify(schema_registry, null, 2)}
 
 Requirements:
-1. Use Supabase client methods ONLY (never raw SQL)
-2. Include proper CORS headers
-3. Authenticate using JWT from Authorization header
-4. Parse parameters from request body
-5. Use RLS-aware queries (will inherit user's permissions)
-6. Return structured JSON: { success: true, count: number, data: array }
-7. Handle errors gracefully
+1. Generate ONLY the query logic, NOT a complete edge function
+2. Do NOT include any import statements
+3. Do NOT include Deno.serve or CORS headers
+4. The code will receive these parameters:
+   - supabase: Authenticated Supabase client (already set up with user's RLS)
+   - args: Object containing the tool parameters
+   - console: For logging
+   - JSON: For JSON operations
+5. Use Supabase client methods ONLY (never raw SQL)
+6. Return a structured object: { success: true, count: number, data: array }
+7. Handle errors with try-catch and return: { success: false, error: string }
 8. Add console.log statements for debugging
-9. Validate all input parameters
-10. Use proper TypeScript types
+9. Validate all input parameters from args object
 
-Return ONLY the complete TypeScript code, nothing else. The code must be ready to execute.`;
+Example format:
+try {
+  console.log('Executing tool with args:', args);
+  
+  // Validate inputs
+  if (!args.param1) {
+    return { success: false, error: 'param1 is required' };
+  }
+  
+  // Execute query
+  const { data, error } = await supabase
+    .from('table_name')
+    .select('*')
+    .eq('column', args.param1);
+  
+  if (error) {
+    console.error('Query error:', error);
+    return { success: false, error: error.message };
+  }
+  
+  console.log('Query successful, returned', data.length, 'rows');
+  return { success: true, count: data.length, data };
+} catch (error) {
+  console.error('Execution error:', error);
+  return { success: false, error: error.message };
+}
+
+Return ONLY the query logic code, nothing else.`;
 
     const response = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
       method: 'POST',
@@ -97,13 +127,24 @@ Return ONLY the complete TypeScript code, nothing else. The code must be ready t
     let code = aiResponse.choices[0].message.content;
 
     // Extract code from markdown blocks if present
-    const codeBlockMatch = code.match(/```typescript\n([\s\S]*?)\n```/) || 
-                           code.match(/```ts\n([\s\S]*?)\n```/) ||
-                           code.match(/```\n([\s\S]*?)\n```/);
-    
+    const codeBlockMatch = code.match(/```(?:typescript|ts|javascript|js)?\n([\s\S]*?)\n```/);
     if (codeBlockMatch) {
       code = codeBlockMatch[1];
     }
+
+    // Remove any accidental import statements
+    code = code.replace(/^import\s+.*?from\s+['"].*?['"];?\s*$/gm, '');
+    code = code.replace(/^import\s+['"].*?['"];?\s*$/gm, '');
+
+    // Remove Deno.serve wrapper if present
+    code = code.replace(/Deno\.serve\(async\s*\(req\)\s*=>\s*\{[\s\S]*$/, '');
+    code = code.replace(/^\}\);?\s*$/gm, '');
+    
+    // Remove CORS headers definitions
+    code = code.replace(/const\s+corsHeaders\s*=\s*\{[\s\S]*?\};?\s*/g, '');
+    
+    // Clean up extra whitespace
+    code = code.trim();
 
     return new Response(JSON.stringify({
       success: true,

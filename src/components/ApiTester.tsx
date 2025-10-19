@@ -1,23 +1,46 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Loader2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { ApiEndpoint } from './EndpointManager';
 import { DynamicDataTable } from './DynamicDataTable';
+import { supabase } from '@/integrations/supabase/client';
 
 interface ApiTesterProps {
   endpoint: ApiEndpoint;
+  configId: string | null;
 }
 
-export function ApiTester({ endpoint }: ApiTesterProps) {
+export function ApiTester({ endpoint, configId }: ApiTesterProps) {
   const [loading, setLoading] = useState(false);
   const [response, setResponse] = useState<any>(null);
   const [error, setError] = useState<string | null>(null);
+  const [config, setConfig] = useState<{ base_url: string; bearer_token: string } | null>(null);
   const { toast } = useToast();
 
+  useEffect(() => {
+    const loadConfig = async () => {
+      if (!configId) return;
+      
+      const { data, error } = await supabase
+        .from('api_configurations')
+        .select('*')
+        .eq('id', configId)
+        .single();
+
+      if (error) {
+        console.error('Error loading config:', error);
+        return;
+      }
+
+      setConfig(data);
+    };
+
+    loadConfig();
+  }, [configId]);
+
   const handleSendRequest = async () => {
-    const config = localStorage.getItem('api_config');
     if (!config) {
       toast({
         title: "Configuration missing",
@@ -27,39 +50,39 @@ export function ApiTester({ endpoint }: ApiTesterProps) {
       return;
     }
 
-    const { baseUrl, bearerToken } = JSON.parse(config);
-
     setLoading(true);
     setError(null);
     setResponse(null);
 
     try {
-      const url = `${baseUrl}${endpoint.path}`;
-      const res = await fetch(url, {
-        method: endpoint.method,
-        headers: {
-          'Authorization': `Bearer ${bearerToken}`,
-          'Content-Type': 'application/json',
+      const url = `${config.base_url}${endpoint.path}`;
+      
+      console.log('Sending request through proxy:', { url, method: endpoint.method });
+
+      const { data, error: proxyError } = await supabase.functions.invoke('proxy-api-request', {
+        body: {
+          url,
+          method: endpoint.method,
+          bearerToken: config.bearer_token,
         },
       });
 
-      let data;
-      try {
-        data = await res.json();
-      } catch {
-        data = { error: 'Failed to parse response as JSON' };
+      if (proxyError) {
+        throw new Error(proxyError.message);
       }
 
-      if (!res.ok) {
-        setError(`HTTP ${res.status}: ${res.statusText}`);
-        setResponse(data);
+      console.log('Proxy response:', data);
+
+      if (data.status >= 400) {
+        setError(`HTTP ${data.status}: ${data.statusText}`);
+        setResponse(data.data);
         toast({
           title: "Request failed",
-          description: `${endpoint.method} ${endpoint.path} - ${res.status}`,
+          description: `${endpoint.method} ${endpoint.path} - ${data.status}`,
           variant: "destructive",
         });
       } else {
-        setResponse(data);
+        setResponse(data.data);
         toast({
           title: "Request successful",
           description: `${endpoint.method} ${endpoint.path}`,
@@ -67,6 +90,7 @@ export function ApiTester({ endpoint }: ApiTesterProps) {
       }
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Unknown error';
+      console.error('Request error:', err);
       setError(message);
       toast({
         title: "Request failed",

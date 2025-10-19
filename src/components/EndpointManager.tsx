@@ -8,6 +8,8 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, Di
 import { Trash2, Plus } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { ApiTester } from './ApiTester';
+import { supabase } from '@/integrations/supabase/client';
+import { useAuth } from '@/hooks/useAuth';
 
 export interface ApiEndpoint {
   id: string;
@@ -16,7 +18,11 @@ export interface ApiEndpoint {
   path: string;
 }
 
-export function EndpointManager() {
+interface EndpointManagerProps {
+  configId: string | null;
+}
+
+export function EndpointManager({ configId }: EndpointManagerProps) {
   const [endpoints, setEndpoints] = useState<ApiEndpoint[]>([]);
   const [newEndpoint, setNewEndpoint] = useState<Omit<ApiEndpoint, 'id'>>({
     name: '',
@@ -26,21 +32,65 @@ export function EndpointManager() {
   const [selectedEndpoint, setSelectedEndpoint] = useState<ApiEndpoint | null>(null);
   const [dialogOpen, setDialogOpen] = useState(false);
   const { toast } = useToast();
+  const { user } = useAuth();
 
   useEffect(() => {
-    const stored = localStorage.getItem('api_endpoints');
-    if (stored) {
-      setEndpoints(JSON.parse(stored));
-    }
-  }, []);
+    if (!user || !configId) return;
 
-  const saveEndpoints = (updated: ApiEndpoint[]) => {
-    localStorage.setItem('api_endpoints', JSON.stringify(updated));
-    setEndpoints(updated);
-  };
+    const loadEndpoints = async () => {
+      // Try to migrate localStorage data first
+      const stored = localStorage.getItem('api_endpoints');
+      if (stored) {
+        const localEndpoints = JSON.parse(stored);
+        
+        for (const endpoint of localEndpoints) {
+          const { data: existing } = await supabase
+            .from('api_endpoints')
+            .select('*')
+            .eq('user_id', user.id)
+            .eq('name', endpoint.name)
+            .single();
 
-  const handleAdd = () => {
-    if (!newEndpoint.name || !newEndpoint.path) {
+          if (!existing) {
+            await supabase
+              .from('api_endpoints')
+              .insert({
+                user_id: user.id,
+                config_id: configId,
+                name: endpoint.name,
+                method: endpoint.method,
+                path: endpoint.path,
+              });
+          }
+        }
+        localStorage.removeItem('api_endpoints');
+      }
+
+      // Load from database
+      const { data, error } = await supabase
+        .from('api_endpoints')
+        .select('*')
+        .eq('user_id', user.id)
+        .eq('config_id', configId);
+
+      if (error) {
+        console.error('Error loading endpoints:', error);
+        return;
+      }
+
+      setEndpoints(data.map(e => ({
+        id: e.id,
+        name: e.name,
+        method: e.method as any,
+        path: e.path,
+      })));
+    };
+
+    loadEndpoints();
+  }, [user, configId]);
+
+  const handleAdd = async () => {
+    if (!newEndpoint.name || !newEndpoint.path || !user || !configId) {
       toast({
         title: "Missing fields",
         description: "Please fill in all fields",
@@ -49,12 +99,35 @@ export function EndpointManager() {
       return;
     }
 
+    const { data, error } = await supabase
+      .from('api_endpoints')
+      .insert({
+        user_id: user.id,
+        config_id: configId,
+        name: newEndpoint.name,
+        method: newEndpoint.method,
+        path: newEndpoint.path,
+      })
+      .select()
+      .single();
+
+    if (error) {
+      toast({
+        title: "Error",
+        description: error.message,
+        variant: "destructive",
+      });
+      return;
+    }
+
     const endpoint: ApiEndpoint = {
-      ...newEndpoint,
-      id: crypto.randomUUID(),
+      id: data.id,
+      name: data.name,
+      method: data.method as any,
+      path: data.path,
     };
 
-    saveEndpoints([...endpoints, endpoint]);
+    setEndpoints([...endpoints, endpoint]);
     setNewEndpoint({ name: '', method: 'GET', path: '' });
     setDialogOpen(false);
     toast({
@@ -63,8 +136,22 @@ export function EndpointManager() {
     });
   };
 
-  const handleDelete = (id: string) => {
-    saveEndpoints(endpoints.filter((e) => e.id !== id));
+  const handleDelete = async (id: string) => {
+    const { error } = await supabase
+      .from('api_endpoints')
+      .delete()
+      .eq('id', id);
+
+    if (error) {
+      toast({
+        title: "Error",
+        description: error.message,
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setEndpoints(endpoints.filter((e) => e.id !== id));
     if (selectedEndpoint?.id === id) {
       setSelectedEndpoint(null);
     }
@@ -192,7 +279,7 @@ export function EndpointManager() {
       {/* Right column - API Tester */}
       <div className="col-span-12 md:col-span-8">
         {selectedEndpoint ? (
-          <ApiTester endpoint={selectedEndpoint} />
+          <ApiTester endpoint={selectedEndpoint} configId={configId} />
         ) : (
           <Card className="h-full">
             <CardContent className="flex items-center justify-center h-full min-h-[400px]">

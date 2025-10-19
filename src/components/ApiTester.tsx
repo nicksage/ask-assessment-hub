@@ -105,7 +105,7 @@ export function ApiTester({ endpoint, configId }: ApiTesterProps) {
   return (
     <Card>
       <CardHeader>
-        <CardTitle>API Tester: {endpoint.name}</CardTitle>
+        <CardTitle>{endpoint.name}</CardTitle>
         <CardDescription>
           <span className="font-mono bg-muted px-1 rounded">{endpoint.method}</span>{' '}
           {endpoint.path}

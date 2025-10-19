@@ -61,7 +61,6 @@ Rules:
 4. Include which tables will be queried
 5. Provide plain English description of the query logic
 6. Keep parameters simple and practical
-7. **CRITICAL**: Check if the schema shows foreign key relationships. If you need to join tables but the schema doesn't list foreign keys between them, include a note in the description that says "Note: This requires foreign key constraints between [table1].[column] and [table2].[id] for proper relationship detection."
 
 Return ONLY valid JSON in this exact format:
 {

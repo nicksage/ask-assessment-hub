@@ -1419,13 +1419,6 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: "fk_risks_risk_category"
-            columns: ["risk_category_id"]
-            isOneToOne: false
-            referencedRelation: "risk_categories"
-            referencedColumns: ["id"]
-          },
-          {
             foreignKeyName: "risks_source_endpoint_id_fkey"
             columns: ["source_endpoint_id"]
             isOneToOne: false

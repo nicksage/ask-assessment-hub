@@ -50,10 +50,30 @@ Deno.serve(async (req) => {
       throw new Error('LOVABLE_API_KEY not configured');
     }
 
+    // Add learned patterns to schema context
+    let learnedContext = '';
+    if (schemaData.learned_patterns && schemaData.learned_patterns.patterns && schemaData.learned_patterns.patterns.length > 0) {
+      learnedContext = `\n\nLEARNED QUERY PATTERNS (use these as reference for similar queries):
+${schemaData.learned_patterns.patterns.map((p: any) => 
+  `- When user asks: "${p.user_asks}"
+    Correct interpretation: ${p.correct_interpretation}
+    Tables used: ${p.tables_used.join(', ')}
+    Confidence: ${(p.confidence * 100).toFixed(0)}% | Used ${p.usage_count} times`
+).join('\n')}`;
+    }
+
     // System prompt with schema context
     const systemPrompt = `You are an intelligent data assistant that helps users query and analyze their synced data.
 
-${schemaContext}
+${schemaContext}${learnedContext}
+
+QUERY INTERPRETATION PROTOCOL:
+Before executing any queries, ALWAYS explain your interpretation in this format:
+"I understand you want to [interpretation]. I'll [approach]."
+
+Example:
+User: "Show me all entity risk assessments"
+AI: "I understand you want to see all assessments where the type is 'EntityRisk'. I'll query the assessments table with that filter. Let me do that now..."
 
 QUERY CAPABILITIES:
 1. Single-table queries with filtering, sorting, and pagination
@@ -352,6 +372,21 @@ Always be concise and helpful. Format data in a readable way. When executing mul
     
     console.log(`Query completed after ${iterationCount} iteration(s)`);
 
+    // Detect if this is a confirmation/correction message
+    if (messages.length >= 2) {
+      const lastUserMessage = messages[messages.length - 1].content.toLowerCase();
+      const isConfirmation = /^(yes|correct|right|exactly|that's right|perfect|thanks|thank you)/i.test(lastUserMessage);
+      const isCorrection = /(no|not|actually|instead|i meant|wrong)/i.test(lastUserMessage);
+
+      if (isConfirmation && messages.length >= 2) {
+        // Extract and store learning from confirmed interpretation
+        await storeQueryLearning(user.id, messages, conversationHistory, 'confirmed', supabase);
+      } else if (isCorrection) {
+        // Store correction for learning
+        await storeQueryLearning(user.id, messages, conversationHistory, 'corrected', supabase);
+      }
+    }
+
     return new Response(
       JSON.stringify({ 
         message: finalMessage,
@@ -373,3 +408,114 @@ Always be concise and helpful. Format data in a readable way. When executing mul
     );
   }
 });
+
+// Helper functions for learning storage
+async function storeQueryLearning(
+  userId: string,
+  messages: Message[],
+  conversationHistory: Message[],
+  confirmationType: string,
+  supabase: any
+) {
+  try {
+    // Find the user's original query (look for the last user message before the final one)
+    let originalQuery = '';
+    let interpretation = '';
+    
+    // Get the second-to-last user message as the original query
+    const userMessages = messages.filter(m => m.role === 'user');
+    if (userMessages.length >= 2) {
+      originalQuery = userMessages[userMessages.length - 2].content;
+    } else if (userMessages.length === 1) {
+      originalQuery = userMessages[0].content;
+    }
+
+    // Find the AI's interpretation (look for assistant messages in conversation history)
+    const assistantMessages = conversationHistory.filter(m => m.role === 'assistant' && m.content);
+    if (assistantMessages.length > 0) {
+      interpretation = assistantMessages[assistantMessages.length - 1].content || '';
+    }
+
+    if (!originalQuery || !interpretation) {
+      console.log('Could not extract query or interpretation for learning');
+      return;
+    }
+
+    // Extract tables mentioned in the interpretation
+    const tablesInvolved = extractTablesFromInterpretation(interpretation);
+
+    console.log('Storing learning:', { originalQuery, interpretation, tablesInvolved, confirmationType });
+
+    // Check if similar pattern exists
+    const { data: existing, error: selectError } = await supabase
+      .from('query_learnings')
+      .select('*')
+      .eq('user_id', userId)
+      .ilike('query_pattern', `%${originalQuery.substring(0, 50)}%`)
+      .maybeSingle();
+
+    if (selectError) {
+      console.error('Error checking existing learning:', selectError);
+      return;
+    }
+
+    if (existing) {
+      // Update existing learning
+      const newConfidence = Math.min(existing.confidence_score + 0.1, 1.0);
+      const { error: updateError } = await supabase
+        .from('query_learnings')
+        .update({
+          usage_count: existing.usage_count + 1,
+          confidence_score: newConfidence,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', existing.id);
+
+      if (updateError) {
+        console.error('Error updating learning:', updateError);
+      } else {
+        console.log('Updated existing learning with new confidence:', newConfidence);
+      }
+    } else {
+      // Create new learning
+      const { error: insertError } = await supabase
+        .from('query_learnings')
+        .insert({
+          user_id: userId,
+          query_pattern: originalQuery,
+          interpretation: interpretation,
+          tables_involved: tablesInvolved,
+          confirmation_type: confirmationType,
+          confidence_score: 0.7,
+          original_query: originalQuery
+        });
+
+      if (insertError) {
+        console.error('Error inserting learning:', insertError);
+      } else {
+        console.log('Created new learning entry');
+      }
+    }
+  } catch (error) {
+    console.error('Error in storeQueryLearning:', error);
+  }
+}
+
+function extractTablesFromInterpretation(interpretation: string): string[] {
+  const tables = [];
+  // List of known tables from the schema
+  const knownTables = [
+    'assessments', 'entities', 'risks', 'entity_risks', 
+    'assessment_periods', 'entity_types', 'risk_categories'
+  ];
+  
+  const lowerInterpretation = interpretation.toLowerCase();
+  
+  for (const table of knownTables) {
+    if (lowerInterpretation.includes(table)) {
+      tables.push(table);
+    }
+  }
+  
+  return [...new Set(tables)]; // Remove duplicates
+}

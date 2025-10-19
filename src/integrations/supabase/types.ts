@@ -937,6 +937,51 @@ export type Database = {
           },
         ]
       }
+      query_learnings: {
+        Row: {
+          confidence_score: number
+          confirmation_type: string
+          corrected_interpretation: string | null
+          created_at: string
+          id: string
+          interpretation: string
+          original_query: string | null
+          query_pattern: string
+          tables_involved: Json
+          updated_at: string
+          usage_count: number
+          user_id: string
+        }
+        Insert: {
+          confidence_score?: number
+          confirmation_type: string
+          corrected_interpretation?: string | null
+          created_at?: string
+          id?: string
+          interpretation: string
+          original_query?: string | null
+          query_pattern: string
+          tables_involved?: Json
+          updated_at?: string
+          usage_count?: number
+          user_id: string
+        }
+        Update: {
+          confidence_score?: number
+          confirmation_type?: string
+          corrected_interpretation?: string | null
+          created_at?: string
+          id?: string
+          interpretation?: string
+          original_query?: string | null
+          query_pattern?: string
+          tables_involved?: Json
+          updated_at?: string
+          usage_count?: number
+          user_id?: string
+        }
+        Relationships: []
+      }
       risk_categories: {
         Row: {
           admin_team_ids: Json | null

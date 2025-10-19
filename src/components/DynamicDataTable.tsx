@@ -23,12 +23,12 @@ export function DynamicDataTable({ data, endpoint }: DynamicDataTableProps) {
     setDialogOpen(true);
   };
 
-  const handleConfirmSchema = async (tableName: string) => {
+  const handleConfirmSchema = async (tableName: string, selectedColumns: any[]) => {
     if (!analyzedSchema) return;
     
     const result = await createSchema(
       tableName,
-      analyzedSchema.columns,
+      selectedColumns,
       endpoint.id
     );
     

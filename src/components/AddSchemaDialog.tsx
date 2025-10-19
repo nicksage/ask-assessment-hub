@@ -12,6 +12,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Badge } from '@/components/ui/badge';
+import { Checkbox } from '@/components/ui/checkbox';
 import { SchemaAnalysis } from '@/utils/schemaAnalyzer';
 import { Loader2, AlertCircle } from 'lucide-react';
 
@@ -21,7 +22,7 @@ interface AddSchemaDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   schema: SchemaAnalysis | null;
-  onConfirm: (tableName: string) => void;
+  onConfirm: (tableName: string, selectedColumns: any[]) => void;
   isCreating: boolean;
 }
 
@@ -33,13 +34,34 @@ export function AddSchemaDialog({
   isCreating,
 }: AddSchemaDialogProps) {
   const [tableName, setTableName] = useState('');
+  const [selectedColumns, setSelectedColumns] = useState<Set<number>>(new Set());
 
-  // Update table name when schema changes
+  // Update table name and select all columns when schema changes
   useEffect(() => {
     if (schema) {
       setTableName(schema.tableName);
+      // Select all columns by default
+      setSelectedColumns(new Set(schema.columns.map((_, idx) => idx)));
     }
   }, [schema]);
+
+  const toggleColumn = (index: number) => {
+    setSelectedColumns(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(index)) {
+        newSet.delete(index);
+      } else {
+        newSet.add(index);
+      }
+      return newSet;
+    });
+  };
+
+  const handleConfirm = () => {
+    if (!schema) return;
+    const selected = schema.columns.filter((_, idx) => selectedColumns.has(idx));
+    onConfirm(tableName, selected);
+  };
 
   if (!schema) return null;
 
@@ -66,7 +88,7 @@ export function AddSchemaDialog({
           </div>
 
           <div>
-            <Label>Columns ({schema.columns.length})</Label>
+            <Label>Columns ({selectedColumns.size} of {schema.columns.length} selected)</Label>
             <ScrollArea className="h-64 mt-2 border rounded-lg p-4">
               <div className="space-y-2">
                 {schema.columns.map((col, idx) => (
@@ -75,6 +97,10 @@ export function AddSchemaDialog({
                     className="flex items-center justify-between p-2 bg-muted rounded"
                   >
                     <div className="flex-1 flex items-center gap-2">
+                      <Checkbox
+                        checked={selectedColumns.has(idx)}
+                        onCheckedChange={() => toggleColumn(idx)}
+                      />
                       <code className="text-sm font-mono">{col.name}</code>
                       {col.name.startsWith('api_') && RESERVED_COLUMNS.includes(col.name.substring(4)) && (
                         <Badge variant="outline" className="text-xs">
@@ -115,8 +141,8 @@ export function AddSchemaDialog({
             Cancel
           </Button>
           <Button
-            onClick={() => onConfirm(tableName)}
-            disabled={isCreating || !tableName.trim()}
+            onClick={handleConfirm}
+            disabled={isCreating || !tableName.trim() || selectedColumns.size === 0}
           >
             {isCreating && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
             Create Table

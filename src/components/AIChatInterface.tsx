@@ -6,6 +6,7 @@ import { Card } from '@/components/ui/card';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Loader2, Send, Bot, User } from 'lucide-react';
 import { toast } from 'sonner';
+import { GenericDataTable } from './GenericDataTable';
 
 interface Message {
   role: 'user' | 'assistant';
@@ -24,6 +25,29 @@ export function AIChatInterface() {
       scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
     }
   }, [messages]);
+
+  const isTableData = (data: any): boolean => {
+    if (!Array.isArray(data) || data.length === 0) return false;
+    if (typeof data[0] !== 'object') return false;
+    return true;
+  };
+
+  const extractTableData = (data: any): any[] | null => {
+    if (Array.isArray(data)) return data;
+    
+    if (typeof data === 'object' && data !== null) {
+      const possibleKeys = ['data', 'results', 'items', 'records', 'rows'];
+      for (const key of possibleKeys) {
+        if (Array.isArray(data[key]) && data[key].length > 0) {
+          return data[key];
+        }
+      }
+      const arrayKeys = Object.keys(data).filter(k => Array.isArray(data[k]) && data[k].length > 0);
+      if (arrayKeys.length === 1) return data[arrayKeys[0]];
+    }
+    
+    return null;
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -123,13 +147,43 @@ export function AIChatInterface() {
                       <p className="whitespace-pre-wrap">{msg.content}</p>
                     </Card>
                     {msg.data && (
-                      <Card className="p-3 bg-background">
-                        <div className="text-sm font-mono max-h-96 overflow-auto">
-                          <pre className="whitespace-pre-wrap">
-                            {JSON.stringify(msg.data, null, 2)}
-                          </pre>
-                        </div>
-                      </Card>
+                      <div className="space-y-4 w-full mt-2">
+                        {Array.isArray(msg.data) ? (
+                          msg.data.map((result, idx) => {
+                            const tableData = extractTableData(result);
+                            if (tableData && isTableData(tableData)) {
+                              return <GenericDataTable key={idx} data={tableData} title={msg.data.length > 1 ? `Result ${idx + 1}` : undefined} />;
+                            } else {
+                              return (
+                                <Card key={idx} className="p-3 bg-background">
+                                  <div className="text-sm font-mono max-h-96 overflow-auto">
+                                    <pre className="whitespace-pre-wrap">
+                                      {JSON.stringify(result, null, 2)}
+                                    </pre>
+                                  </div>
+                                </Card>
+                              );
+                            }
+                          })
+                        ) : (
+                          (() => {
+                            const tableData = extractTableData(msg.data);
+                            if (tableData && isTableData(tableData)) {
+                              return <GenericDataTable data={tableData} />;
+                            } else {
+                              return (
+                                <Card className="p-3 bg-background">
+                                  <div className="text-sm font-mono max-h-96 overflow-auto">
+                                    <pre className="whitespace-pre-wrap">
+                                      {JSON.stringify(msg.data, null, 2)}
+                                    </pre>
+                                  </div>
+                                </Card>
+                              );
+                            }
+                          })()
+                        )}
+                      </div>
                     )}
                   </div>
                   {msg.role === 'user' && (

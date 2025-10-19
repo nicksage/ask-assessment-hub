@@ -36,10 +36,27 @@ export function DynamicDataTable({ data, endpoint }: DynamicDataTableProps) {
   const handleSyncSchema = async () => {
     if (!existingSchema) return;
 
+    // Extract the actual data array from the API response
+    let dataToSync: any;
+    if (Array.isArray(data)) {
+      dataToSync = data;
+    } else if (typeof data === 'object' && data !== null) {
+      // Check if data has an array property (like { assessments: [...] })
+      const arrayKey = Object.keys(data).find(key => Array.isArray(data[key]));
+      if (arrayKey && Array.isArray(data[arrayKey])) {
+        dataToSync = data[arrayKey];
+        console.log(`Extracted ${dataToSync.length} items from '${arrayKey}' property`);
+      } else {
+        dataToSync = [data];
+      }
+    } else {
+      dataToSync = [data];
+    }
+
     const result = await syncSchema(
       endpoint.id,
       existingSchema.table_name,
-      data
+      dataToSync
     );
 
     if (result.success) {

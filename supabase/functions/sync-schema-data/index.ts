@@ -52,6 +52,7 @@ Deno.serve(async (req) => {
 
     console.log('Syncing data for user:', user.id);
     console.log('Table name:', tableName);
+    console.log('Received newData type:', typeof newData, 'isArray:', Array.isArray(newData));
 
     // Get the schema mapping to understand column structure
     const { data: schemaMapping, error: mappingError } = await supabase
@@ -69,8 +70,23 @@ Deno.serve(async (req) => {
       );
     }
 
-    // Prepare data for insertion
-    const dataArray = Array.isArray(newData) ? newData : [newData];
+    // Prepare data for insertion - handle nested arrays
+    let dataArray: any[];
+    if (Array.isArray(newData)) {
+      dataArray = newData;
+    } else if (typeof newData === 'object' && newData !== null) {
+      // Check if data has an array property (like { assessments: [...] })
+      const arrayKey = Object.keys(newData).find(key => Array.isArray(newData[key]));
+      if (arrayKey && Array.isArray(newData[arrayKey])) {
+        dataArray = newData[arrayKey];
+        console.log(`Extracted ${dataArray.length} items from '${arrayKey}' property`);
+      } else {
+        dataArray = [newData];
+      }
+    } else {
+      dataArray = [newData];
+    }
+    
     const columnMappings = schemaMapping.column_mappings as Array<{ name: string; originalName?: string }>;
     
     console.log('Processing', dataArray.length, 'records');

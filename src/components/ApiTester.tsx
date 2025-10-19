@@ -40,6 +40,12 @@ export function ApiTester({ endpoint, configId }: ApiTesterProps) {
     loadConfig();
   }, [configId]);
 
+  useEffect(() => {
+    // Clear response and error when endpoint changes
+    setResponse(null);
+    setError(null);
+  }, [endpoint.id]);
+
   const handleSendRequest = async () => {
     if (!config) {
       toast({

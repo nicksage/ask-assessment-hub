@@ -139,13 +139,22 @@ DOMAIN KNOWLEDGE - CRITICAL COLUMN MEANINGS:
 - key: Technical identifier
 - is_default: Whether this is a default category
 
+SPECIALIZED QUERY TOOLS (use these when applicable - they are optimized single-step operations):
+- For "show me all [entity type]" queries → use get_entities_by_type (e.g., "show all Products")
+- For "show me risks in [category]" → use get_risks_by_category (e.g., "show Operational risks")
+- For "show assessments from [period/type]" → use get_assessments_by_filter (e.g., "show Risk assessments from 2020")
+- For "show entities with their risks" → use get_entities_with_risks (returns enriched data with risk relationships)
+
+These specialized tools eliminate the need for multi-step lookups and are much faster than using query_data multiple times.
+
 COMMON QUERY PATTERNS:
-1. "Show me all entity risk assessments" → Query assessments table WHERE type equals 'EntityRisk'
-2. "What risk assessments are from 2020?" → Query assessments WHERE type equals 'Risk', then query assessment_periods WHERE name contains '2020', then query assessments with that period_id
-3. "List all operational risks" → First query risk_categories WHERE name equals 'Operational', then query risks with that category_id
-4. "Which entities are linked to [risk name]?" → First find risk by name, then query entity_risks with that risk_id, then get entity details
-5. "Show finalized assessments" → Query assessments WHERE status equals 'Finalized'
-6. "Count risks by category" → Use aggregate_data to COUNT risks grouped by risk_category_id
+1. "Show me all entity risk assessments" → Use get_assessments_by_filter with type_filter='EntityRisk'
+2. "What risk assessments are from 2020?" → Use get_assessments_by_filter with type_filter='Risk' and period_name='2020'
+3. "List all operational risks" → Use get_risks_by_category with category_name='Operational'
+4. "Show all Products" → Use get_entities_by_type with type_name='Product'
+5. "Show entities with their risks" → Use get_entities_with_risks
+6. "Show finalized assessments" → Use query_data on assessments WHERE status equals 'Finalized'
+7. "Count risks by category" → Use aggregate_data to COUNT risks grouped by risk_category_id
 
 KEY INSIGHTS:
 - When users mention "assessment types", they mean the 'type' column in assessments table
@@ -239,6 +248,92 @@ Always be concise and helpful. Format data in a readable way. When executing mul
                 required: ['table', 'aggregation']
               }
             }
+          },
+          {
+            type: 'function',
+            function: {
+              name: 'get_entities_by_type',
+              description: 'Get all entities of a specific type (e.g., Products, Applications, Vendors). Use this INSTEAD of querying entity_types and entities separately. This is a single-step optimized query.',
+              parameters: {
+                type: 'object',
+                properties: {
+                  type_name: {
+                    type: 'string',
+                    description: 'The entity type name (case-insensitive, e.g., "Product", "Application", "Vendor")'
+                  },
+                  limit: {
+                    type: 'number',
+                    description: 'Maximum number of records to return (default: 100)'
+                  }
+                },
+                required: ['type_name']
+              }
+            }
+          },
+          {
+            type: 'function',
+            function: {
+              name: 'get_risks_by_category',
+              description: 'Get all risks in a specific category (e.g., Operational, Financial, Compliance). Use this INSTEAD of querying risk_categories and risks separately. This is a single-step optimized query.',
+              parameters: {
+                type: 'object',
+                properties: {
+                  category_name: {
+                    type: 'string',
+                    description: 'The risk category name (case-insensitive, e.g., "Operational", "Financial", "Compliance")'
+                  },
+                  limit: {
+                    type: 'number',
+                    description: 'Maximum number of records to return (default: 100)'
+                  }
+                },
+                required: ['category_name']
+              }
+            }
+          },
+          {
+            type: 'function',
+            function: {
+              name: 'get_assessments_by_filter',
+              description: 'Get assessments filtered by type and/or period name. Use this INSTEAD of multiple lookups for assessment filtering. Both parameters are optional.',
+              parameters: {
+                type: 'object',
+                properties: {
+                  type_filter: {
+                    type: 'string',
+                    description: 'Assessment type to filter by (e.g., "Risk", "EntityRisk", "RiskControl"). Optional.'
+                  },
+                  period_name: {
+                    type: 'string',
+                    description: 'Assessment period name to search for (e.g., "2020", "Q1 2021"). Optional, case-insensitive partial match.'
+                  },
+                  limit: {
+                    type: 'number',
+                    description: 'Maximum number of records to return (default: 100)'
+                  }
+                }
+              }
+            }
+          },
+          {
+            type: 'function',
+            function: {
+              name: 'get_entities_with_risks',
+              description: 'Get entities with their associated risks in a single query. Returns enriched entity data with nested risk information. Use this INSTEAD of separate queries to entities, entity_risks, and risks tables.',
+              parameters: {
+                type: 'object',
+                properties: {
+                  entity_type_name: {
+                    type: 'string',
+                    description: 'Filter by entity type name (optional, case-insensitive)'
+                  },
+                  limit: {
+                    type: 'number',
+                    description: 'Maximum number of entities to return (default: 100)'
+                  }
+                }
+              }
+            }
           }
         ];
 
@@ -305,6 +400,26 @@ Always be concise and helpful. Format data in a readable way. When executing mul
               body: functionArgs
             });
             result = analyticsError ? { error: analyticsError.message } : analyticsData;
+          } else if (functionName === 'get_entities_by_type') {
+            const { data, error } = await supabase.functions.invoke('get-entities-by-type', {
+              body: functionArgs
+            });
+            result = error ? { error: error.message } : data;
+          } else if (functionName === 'get_risks_by_category') {
+            const { data, error } = await supabase.functions.invoke('get-risks-by-category', {
+              body: functionArgs
+            });
+            result = error ? { error: error.message } : data;
+          } else if (functionName === 'get_assessments_by_filter') {
+            const { data, error } = await supabase.functions.invoke('get-assessments-by-filter', {
+              body: functionArgs
+            });
+            result = error ? { error: error.message } : data;
+          } else if (functionName === 'get_entities_with_risks') {
+            const { data, error } = await supabase.functions.invoke('get-entities-with-risks', {
+              body: functionArgs
+            });
+            result = error ? { error: error.message } : data;
           }
           
           console.log(`Tool result for ${functionName}:`, JSON.stringify(result, null, 2));

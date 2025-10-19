@@ -5,6 +5,12 @@ import { Toaster } from '@/components/ui/toaster';
 import { Button } from '@/components/ui/button';
 import { Settings } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 
 const Index = () => {
   const [apiKey, setApiKey] = useState<string | null>(null);
@@ -27,14 +33,25 @@ const Index = () => {
   return (
     <>
       <div className="relative">
-        <Button
-          variant="ghost"
-          size="icon"
-          className="absolute top-4 right-4 z-10"
-          onClick={() => navigate('/settings')}
-        >
-          <Settings className="h-5 w-5" />
-        </Button>
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button
+              variant="ghost"
+              size="icon"
+              className="absolute top-4 right-4 z-10"
+            >
+              <Settings className="h-5 w-5" />
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end" className="w-56 bg-background z-50">
+            <DropdownMenuItem onClick={() => navigate('/settings/api-config')}>
+              API Configuration
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={() => navigate('/settings/endpoints')}>
+              Endpoints
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
         <ChatInterface apiKey={apiKey} />
       </div>
       <Toaster />

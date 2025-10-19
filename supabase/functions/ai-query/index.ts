@@ -110,7 +110,6 @@ DOMAIN KNOWLEDGE - CRITICAL COLUMN MEANINGS:
 - name: The entity name/title
 - status: Current entity status
 - description: Detailed entity information
-- prior_audit_id, upcoming_audit_id: Links to past and future audits
 - Custom fields: Many custom_text*, custom_date*, custom_select* fields for flexible data
 
 **Risks Table:**
@@ -141,7 +140,7 @@ DOMAIN KNOWLEDGE - CRITICAL COLUMN MEANINGS:
 - is_default: Whether this is a default category
 
 COMMON QUERY PATTERNS:
-1. "Show me entity risk assessments" → Query assessments WHERE type equals 'EntityRisk'
+1. "Show me all entity risk assessments" → Query assessments table WHERE type equals 'EntityRisk'
 2. "What assessments are from 2020?" → First query assessment_periods WHERE name contains '2020', then query assessments with that period_id
 3. "List all operational risks" → First query risk_categories WHERE name equals 'Operational', then query risks with that category_id
 4. "Which entities are linked to [risk name]?" → First find risk by name, then query entity_risks with that risk_id, then get entity details

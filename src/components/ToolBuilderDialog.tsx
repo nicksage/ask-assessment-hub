@@ -38,6 +38,8 @@ export const ToolBuilderDialog = ({
   const [schemaRegistry, setSchemaRegistry] = useState<any>(null);
   const [wizardData, setWizardData] = useState<WizardData | null>(null);
   const [preserveWizardState, setPreserveWizardState] = useState(false);
+  const [schemaLoading, setSchemaLoading] = useState(false);
+  const [schemaError, setSchemaError] = useState<string | null>(null);
 
   useEffect(() => {
     if (open) {
@@ -47,11 +49,21 @@ export const ToolBuilderDialog = ({
 
   const loadSchemaRegistry = async () => {
     try {
+      setSchemaLoading(true);
+      setSchemaError(null);
       const { data, error } = await supabase.functions.invoke('get-schema-registry');
       if (error) throw error;
       setSchemaRegistry(data);
     } catch (error: any) {
       console.error('Failed to load schema:', error);
+      setSchemaError(error.message || 'Failed to load database schema');
+      toast({
+        title: "Schema loading failed",
+        description: "Unable to load database schema. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setSchemaLoading(false);
     }
   };
 
@@ -305,16 +317,43 @@ export const ToolBuilderDialog = ({
           </div>
         )}
 
-        {step === 1 && mode === 'guided' && schemaRegistry && (
-          <GuidedToolBuilder
-            schemaRegistry={schemaRegistry}
-            onComplete={handleWizardComplete}
-            onCancel={() => {
-              setMode('simple');
-              setPreserveWizardState(false);
-            }}
-            initialData={preserveWizardState ? wizardData : undefined}
-          />
+        {step === 1 && mode === 'guided' && (
+          <>
+            {schemaLoading && (
+              <div className="flex flex-col items-center justify-center py-12 space-y-4">
+                <Loader2 className="h-8 w-8 animate-spin text-primary" />
+                <p className="text-sm text-muted-foreground">Loading database schema...</p>
+              </div>
+            )}
+            
+            {schemaError && !schemaLoading && (
+              <div className="space-y-4">
+                <div className="rounded-lg bg-destructive/10 border border-destructive/20 p-4">
+                  <p className="text-sm text-destructive">{schemaError}</p>
+                </div>
+                <div className="flex justify-end gap-2">
+                  <Button variant="outline" onClick={() => setMode('simple')}>
+                    Back to Simple Mode
+                  </Button>
+                  <Button onClick={loadSchemaRegistry}>
+                    Retry
+                  </Button>
+                </div>
+              </div>
+            )}
+            
+            {schemaRegistry && !schemaLoading && (
+              <GuidedToolBuilder
+                schemaRegistry={schemaRegistry}
+                onComplete={handleWizardComplete}
+                onCancel={() => {
+                  setMode('simple');
+                  setPreserveWizardState(false);
+                }}
+                initialData={preserveWizardState ? wizardData : undefined}
+              />
+            )}
+          </>
         )}
 
         {step === 2 && toolDefinition && (

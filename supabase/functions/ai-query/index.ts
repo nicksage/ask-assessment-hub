@@ -37,6 +37,21 @@ Deno.serve(async (req) => {
       throw new Error('Unauthorized');
     }
 
+    // Get user's AI provider settings
+    const { data: aiSettings } = await supabase
+      .from('ai_settings')
+      .select('provider, openai_api_key')
+      .eq('user_id', user.id)
+      .single();
+    
+    const aiProvider = aiSettings?.provider || 'lovable';
+    const openaiApiKey = aiSettings?.openai_api_key;
+
+    // Validate OpenAI API key if using OpenAI
+    if (aiProvider === 'openai' && !openaiApiKey) {
+      throw new Error('OpenAI API key not configured. Please add it in settings.');
+    }
+
     // Get schema registry for context
     const { data: schemaData, error: schemaError } = await supabase.functions.invoke('get-schema-registry');
     
@@ -52,11 +67,7 @@ Deno.serve(async (req) => {
       .eq('status', 'active');
 
     console.log(`Loaded ${customTools?.length || 0} custom tools for user`);
-
-    const LOVABLE_API_KEY = Deno.env.get('LOVABLE_API_KEY');
-    if (!LOVABLE_API_KEY) {
-      throw new Error('LOVABLE_API_KEY not configured');
-    }
+    console.log(`Using AI provider: ${aiProvider}`);
 
     // System prompt with schema context
     const systemPrompt = `You are an intelligent data assistant that helps users query and analyze their synced data.
@@ -189,7 +200,7 @@ Always be concise and helpful. Format data in a readable way. When executing mul
       ...messages
     ];
 
-    console.log('Calling Lovable AI...');
+    console.log(`Calling ${aiProvider === 'openai' ? 'OpenAI' : 'Lovable AI'}...`);
 
     // Define tools array for reuse in iterations
     const tools = [
@@ -272,24 +283,46 @@ Always be concise and helpful. Format data in a readable way. When executing mul
       tools.push(...customTools.map(ct => ct.tool_schema));
     }
 
-    // Call Lovable AI with tool definitions
-    const aiResponse = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${LOVABLE_API_KEY}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        model: 'google/gemini-2.5-flash',
-        messages: aiMessages,
-        tools: tools,
-        tool_choice: 'auto'
-      }),
-    });
+    // Call AI provider with tool definitions
+    let aiResponse;
+    if (aiProvider === 'openai') {
+      aiResponse = await fetch('https://api.openai.com/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${openaiApiKey}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          model: 'gpt-5-2025-08-07',
+          messages: aiMessages,
+          tools: tools,
+          tool_choice: 'auto'
+        }),
+      });
+    } else {
+      const LOVABLE_API_KEY = Deno.env.get('LOVABLE_API_KEY');
+      if (!LOVABLE_API_KEY) {
+        throw new Error('LOVABLE_API_KEY not configured');
+      }
+      
+      aiResponse = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${LOVABLE_API_KEY}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          model: 'google/gemini-2.5-flash',
+          messages: aiMessages,
+          tools: tools,
+          tool_choice: 'auto'
+        }),
+      });
+    }
 
     if (!aiResponse.ok) {
       const errorText = await aiResponse.text();
-      console.error('Lovable AI error:', aiResponse.status, errorText);
+      console.error(`${aiProvider === 'openai' ? 'OpenAI' : 'Lovable AI'} error:`, aiResponse.status, errorText);
       throw new Error(`AI request failed: ${aiResponse.status}`);
     }
 
@@ -360,22 +393,39 @@ Always be concise and helpful. Format data in a readable way. When executing mul
       conversationHistory.push(...toolResults);
       
       // Send back to AI for next decision
-      const nextResponse = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${LOVABLE_API_KEY}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          model: 'google/gemini-2.5-flash',
-          messages: conversationHistory,
-          tools: tools // Keep tools available for next iteration
-        }),
-      });
+      let nextResponse;
+      if (aiProvider === 'openai') {
+        nextResponse = await fetch('https://api.openai.com/v1/chat/completions', {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${openaiApiKey}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            model: 'gpt-5-2025-08-07',
+            messages: conversationHistory,
+            tools: tools
+          }),
+        });
+      } else {
+        const LOVABLE_API_KEY = Deno.env.get('LOVABLE_API_KEY');
+        nextResponse = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${LOVABLE_API_KEY}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            model: 'google/gemini-2.5-flash',
+            messages: conversationHistory,
+            tools: tools // Keep tools available for next iteration
+          }),
+        });
+      }
       
       if (!nextResponse.ok) {
         const errorText = await nextResponse.text();
-        console.error('Lovable AI error in iteration:', nextResponse.status, errorText);
+        console.error(`${aiProvider === 'openai' ? 'OpenAI' : 'Lovable AI'} error in iteration:`, nextResponse.status, errorText);
         throw new Error(`AI request failed in iteration ${iterationCount}: ${nextResponse.status}`);
       }
       

@@ -48,6 +48,9 @@ const Index = () => {
               <DropdownMenuItem onClick={() => navigate('/settings/endpoints')}>
                 Endpoints
               </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => navigate('/settings/ai-provider')}>
+                AI Provider
+              </DropdownMenuItem>
               <DropdownMenuItem onClick={() => navigate('/settings/tools')}>
                 Tool Builder
               </DropdownMenuItem>

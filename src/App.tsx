@@ -22,6 +22,7 @@ const App = () => (
           <Route path="/auth" element={<Auth />} />
           <Route path="/settings/api-config" element={<Settings />} />
           <Route path="/settings/endpoints" element={<Settings />} />
+          <Route path="/settings/ai-provider" element={<Settings />} />
           <Route path="/settings/tools" element={<ToolBuilder />} />
           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
           <Route path="*" element={<NotFound />} />

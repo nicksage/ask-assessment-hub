@@ -7,6 +7,7 @@ import { useToast } from '@/hooks/use-toast';
 import { Settings as SettingsIcon, ArrowLeft, LogOut } from 'lucide-react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { EndpointManager } from '@/components/EndpointManager';
+import { AISettings } from '@/components/AISettings';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 interface ApiConfig {
@@ -35,6 +36,7 @@ const Settings = () => {
   } = useAuth();
   const isApiConfig = location.pathname === '/settings/api-config';
   const isEndpoints = location.pathname === '/settings/endpoints';
+  const isAiProvider = location.pathname === '/settings/ai-provider';
   useEffect(() => {
     if (!authLoading && !user) {
       navigate('/auth');
@@ -134,7 +136,7 @@ const Settings = () => {
             <div className="flex items-center gap-2">
               <SettingsIcon className="h-6 w-6" />
               <h1 className="text-3xl font-bold">
-                {isApiConfig ? 'API Configuration' : 'Endpoints'}
+                {isApiConfig ? 'API Configuration' : isAiProvider ? 'AI Provider' : 'Endpoints'}
               </h1>
             </div>
           </div>
@@ -178,6 +180,8 @@ const Settings = () => {
           </Card>}
 
         {isEndpoints && <EndpointManager configId={configId} />}
+        
+        {isAiProvider && <AISettings />}
       </div>
     </div>;
 };

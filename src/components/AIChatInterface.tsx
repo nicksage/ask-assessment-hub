@@ -4,6 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card } from '@/components/ui/card';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import { Badge } from '@/components/ui/badge';
 import { Loader2, Send, Bot, User } from 'lucide-react';
 import { toast } from 'sonner';
 import { GenericDataTable } from './GenericDataTable';
@@ -18,7 +19,25 @@ export function AIChatInterface() {
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
+  const [aiProvider, setAiProvider] = useState<'lovable' | 'openai'>('lovable');
   const scrollRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    // Load AI provider setting
+    const loadAiProvider = async () => {
+      try {
+        const { data } = await supabase.functions.invoke('manage-ai-settings', {
+          method: 'GET'
+        });
+        if (data?.provider) {
+          setAiProvider(data.provider);
+        }
+      } catch (error) {
+        console.error('Error loading AI provider:', error);
+      }
+    };
+    loadAiProvider();
+  }, []);
 
   useEffect(() => {
     if (scrollRef.current) {
@@ -95,6 +114,15 @@ export function AIChatInterface() {
   return (
     <div className="flex flex-col h-[calc(100vh-12rem)]">
       <Card className="flex-1 flex flex-col">
+        <div className="p-3 border-b flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <Bot className="w-5 h-5 text-primary" />
+            <span className="text-sm font-medium">AI Assistant</span>
+          </div>
+          <Badge variant="secondary" className="text-xs">
+            {aiProvider === 'lovable' ? 'Lovable AI (Gemini)' : 'OpenAI (GPT-5)'}
+          </Badge>
+        </div>
         <ScrollArea className="flex-1 p-4" ref={scrollRef}>
           {messages.length === 0 ? (
             <div className="flex flex-col items-center justify-center h-full space-y-4">

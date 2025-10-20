@@ -14,6 +14,33 @@ export type Database = {
   }
   public: {
     Tables: {
+      ai_settings: {
+        Row: {
+          created_at: string | null
+          id: string
+          openai_api_key: string | null
+          provider: Database["public"]["Enums"]["ai_provider"]
+          updated_at: string | null
+          user_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          openai_api_key?: string | null
+          provider?: Database["public"]["Enums"]["ai_provider"]
+          updated_at?: string | null
+          user_id: string
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          openai_api_key?: string | null
+          provider?: Database["public"]["Enums"]["ai_provider"]
+          updated_at?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
       api_configurations: {
         Row: {
           base_url: string
@@ -294,6 +321,110 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "assessments_source_endpoint_id_fkey"
+            columns: ["source_endpoint_id"]
+            isOneToOne: false
+            referencedRelation: "api_endpoints"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      controls: {
+        Row: {
+          assertion_ids: Json | null
+          control_category_id: number | null
+          control_objective: string | null
+          created_at: string | null
+          deleted_at: string | null
+          description: string | null
+          field_data: string | null
+          framework_item_ids: Json | null
+          id: number | null
+          id_code: string | null
+          id_string: string | null
+          implementation_count: number | null
+          library_control_classification_id: string | null
+          library_control_nature_id: string | null
+          library_control_type_id: string | null
+          linkify_uid: string | null
+          multiselect_option_ids: Json | null
+          name: string | null
+          record_id: string
+          record_updated_at: string | null
+          risk_ids: Json | null
+          risk_statement: string | null
+          select_option_ids: Json | null
+          source_endpoint_id: string | null
+          subprocess_id: number | null
+          synced_at: string | null
+          uid: string | null
+          updated_at: string | null
+          user_id: string
+        }
+        Insert: {
+          assertion_ids?: Json | null
+          control_category_id?: number | null
+          control_objective?: string | null
+          created_at?: string | null
+          deleted_at?: string | null
+          description?: string | null
+          field_data?: string | null
+          framework_item_ids?: Json | null
+          id?: number | null
+          id_code?: string | null
+          id_string?: string | null
+          implementation_count?: number | null
+          library_control_classification_id?: string | null
+          library_control_nature_id?: string | null
+          library_control_type_id?: string | null
+          linkify_uid?: string | null
+          multiselect_option_ids?: Json | null
+          name?: string | null
+          record_id?: string
+          record_updated_at?: string | null
+          risk_ids?: Json | null
+          risk_statement?: string | null
+          select_option_ids?: Json | null
+          source_endpoint_id?: string | null
+          subprocess_id?: number | null
+          synced_at?: string | null
+          uid?: string | null
+          updated_at?: string | null
+          user_id: string
+        }
+        Update: {
+          assertion_ids?: Json | null
+          control_category_id?: number | null
+          control_objective?: string | null
+          created_at?: string | null
+          deleted_at?: string | null
+          description?: string | null
+          field_data?: string | null
+          framework_item_ids?: Json | null
+          id?: number | null
+          id_code?: string | null
+          id_string?: string | null
+          implementation_count?: number | null
+          library_control_classification_id?: string | null
+          library_control_nature_id?: string | null
+          library_control_type_id?: string | null
+          linkify_uid?: string | null
+          multiselect_option_ids?: Json | null
+          name?: string | null
+          record_id?: string
+          record_updated_at?: string | null
+          risk_ids?: Json | null
+          risk_statement?: string | null
+          select_option_ids?: Json | null
+          source_endpoint_id?: string | null
+          subprocess_id?: number | null
+          synced_at?: string | null
+          uid?: string | null
+          updated_at?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "controls_source_endpoint_id_fkey"
             columns: ["source_endpoint_id"]
             isOneToOne: false
             referencedRelation: "api_endpoints"
@@ -1419,6 +1550,13 @@ export type Database = {
         }
         Relationships: [
           {
+            foreignKeyName: "fk_risks_risk_category"
+            columns: ["risk_category_id"]
+            isOneToOne: false
+            referencedRelation: "risk_categories"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "risks_source_endpoint_id_fkey"
             columns: ["source_endpoint_id"]
             isOneToOne: false
@@ -1438,6 +1576,7 @@ export type Database = {
       }
     }
     Enums: {
+      ai_provider: "lovable" | "openai"
       tool_status: "draft" | "generating" | "active" | "error"
     }
     CompositeTypes: {
@@ -1566,6 +1705,7 @@ export type CompositeTypes<
 export const Constants = {
   public: {
     Enums: {
+      ai_provider: ["lovable", "openai"],
       tool_status: ["draft", "generating", "active", "error"],
     },
   },

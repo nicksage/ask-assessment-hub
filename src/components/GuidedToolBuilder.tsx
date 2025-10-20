@@ -40,7 +40,8 @@ interface SortConfig {
 }
 
 export const GuidedToolBuilder = ({ schemaRegistry, onComplete, onCancel, initialData }: GuidedToolBuilderProps) => {
-  const [wizardStep, setWizardStep] = useState(initialData ? 4 : 0);
+  // Always start at step 0, even when restoring data
+  const [wizardStep, setWizardStep] = useState(0);
   const [wizardData, setWizardData] = useState<WizardData>(initialData || {
     toolName: '',
     toolDescription: '',

@@ -6,7 +6,8 @@ import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
-import { Loader2, Play, CheckCircle2, XCircle, AlertTriangle } from "lucide-react";
+import { Loader2, Play, CheckCircle2, XCircle, AlertTriangle, Code } from "lucide-react";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 interface ToolTesterProps {
   toolDefinition: any;
@@ -96,6 +97,17 @@ export const ToolTester = ({
           Provide test values and execute the tool to verify it works correctly
         </p>
       </div>
+
+      <Tabs defaultValue="test" className="w-full">
+        <TabsList className="w-full">
+          <TabsTrigger value="test" className="flex-1">Test Tool</TabsTrigger>
+          <TabsTrigger value="code" className="flex-1">
+            <Code className="h-4 w-4 mr-2" />
+            View Code
+          </TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="test" className="space-y-4 mt-4">
 
       {/* Parameter Inputs */}
       <div className="space-y-3 rounded-lg border p-4">
@@ -209,6 +221,51 @@ export const ToolTester = ({
           </Button>
         </div>
       </div>
+        </TabsContent>
+
+        <TabsContent value="code" className="space-y-4 mt-4">
+          <div className="rounded-lg border p-4">
+            <div className="flex items-center justify-between mb-3">
+              <Label className="text-sm font-medium">Generated Code</Label>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  navigator.clipboard.writeText(generatedCode);
+                  toast({
+                    title: "Copied to clipboard",
+                    description: "Code has been copied to your clipboard",
+                  });
+                }}
+              >
+                Copy Code
+              </Button>
+            </div>
+            <div className="max-h-[400px] overflow-auto">
+              <pre className="text-xs bg-muted p-4 rounded">
+                <code>{generatedCode}</code>
+              </pre>
+            </div>
+          </div>
+
+          <div className="flex justify-between">
+            <Button variant="outline" onClick={onBack}>
+              ← Back to Review
+            </Button>
+            <div className="flex gap-2">
+              <Button variant="outline" onClick={onRegenerateCode}>
+                Regenerate Code
+              </Button>
+              <Button 
+                onClick={onDeploy}
+                disabled={testResults && !testResults.success}
+              >
+                Deploy Tool
+              </Button>
+            </div>
+          </div>
+        </TabsContent>
+      </Tabs>
     </div>
   );
 };

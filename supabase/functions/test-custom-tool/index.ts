@@ -65,13 +65,24 @@ Deno.serve(async (req) => {
         JSON: JSON,
       };
 
-      // Wrap code in async function
+      // Wrap code in async function with better error handling
       const wrappedCode = `
         (async function(supabase, args, console, JSON) {
-          ${code}
+          try {
+            console.log('[TEST] Starting code execution with args:', args);
+            const result = await (async function() {
+              ${code}
+            })();
+            console.log('[TEST] Code execution completed, result:', result);
+            return result;
+          } catch (innerError) {
+            console.error('[TEST] Error during code execution:', innerError);
+            throw innerError;
+          }
         })
       `;
 
+      console.log('[TEST] About to eval and execute code');
       const executeFunc = eval(wrappedCode);
       const result = await executeFunc(
         executionContext.supabase,
@@ -79,6 +90,18 @@ Deno.serve(async (req) => {
         executionContext.console,
         executionContext.JSON
       );
+
+      console.log('[TEST] Final result:', result);
+
+      if (!result) {
+        return new Response(JSON.stringify({
+          success: false,
+          error: 'Code executed but returned no result. Make sure your code returns an object with { success, count, data }',
+          test_mode: true
+        }), {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
 
       return new Response(JSON.stringify({
         ...result,

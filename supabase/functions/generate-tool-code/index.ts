@@ -225,7 +225,7 @@ FORBIDDEN PATTERNS (will cause errors):
 
 Return ONLY the query logic code, nothing else.`;
 
-    // Use better model with lower temperature for more accurate code
+    // Use better model - Gemini doesn't support custom temperature
     const aiConfig = useOpenAI 
       ? {
           url: 'https://api.openai.com/v1/chat/completions',
@@ -236,9 +236,21 @@ Return ONLY the query logic code, nothing else.`;
       : {
           url: 'https://ai.gateway.lovable.dev/v1/chat/completions',
           apiKey: LOVABLE_API_KEY,
-          model: 'google/gemini-2.5-pro',
-          temperature: 0.1
+          model: 'google/gemini-2.5-pro'
         };
+
+    const requestBody: any = {
+      model: aiConfig.model,
+      messages: [
+        { role: 'system', content: systemPrompt },
+        { role: 'user', content: 'Generate the complete edge function code.' }
+      ]
+    };
+
+    // Only add temperature for OpenAI models
+    if (useOpenAI) {
+      requestBody.temperature = aiConfig.temperature;
+    }
 
     const response = await fetch(aiConfig.url, {
       method: 'POST',
@@ -246,14 +258,7 @@ Return ONLY the query logic code, nothing else.`;
         'Authorization': `Bearer ${aiConfig.apiKey}`,
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({
-        model: aiConfig.model,
-        messages: [
-          { role: 'system', content: systemPrompt },
-          { role: 'user', content: 'Generate the complete edge function code.' }
-        ],
-        temperature: aiConfig.temperature,
-      }),
+      body: JSON.stringify(requestBody),
     });
 
     if (!response.ok) {

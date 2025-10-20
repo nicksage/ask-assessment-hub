@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import {
   Dialog,
   DialogContent,
@@ -14,6 +14,8 @@ import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { Loader2, Sparkles, CheckCircle2 } from "lucide-react";
+import { GuidedToolBuilder, type WizardData } from "./GuidedToolBuilder";
+import { ToolTester } from "./ToolTester";
 
 interface ToolBuilderDialogProps {
   open: boolean;
@@ -27,13 +29,32 @@ export const ToolBuilderDialog = ({
   onSuccess,
 }: ToolBuilderDialogProps) => {
   const { toast } = useToast();
+  const [mode, setMode] = useState<'simple' | 'guided'>('simple');
   const [step, setStep] = useState(1);
   const [loading, setLoading] = useState(false);
   const [description, setDescription] = useState("");
   const [toolDefinition, setToolDefinition] = useState<any>(null);
   const [generatedCode, setGeneratedCode] = useState("");
+  const [schemaRegistry, setSchemaRegistry] = useState<any>(null);
+
+  useEffect(() => {
+    if (open) {
+      loadSchemaRegistry();
+    }
+  }, [open]);
+
+  const loadSchemaRegistry = async () => {
+    try {
+      const { data, error } = await supabase.functions.invoke('get-schema-registry');
+      if (error) throw error;
+      setSchemaRegistry(data);
+    } catch (error: any) {
+      console.error('Failed to load schema:', error);
+    }
+  };
 
   const handleReset = () => {
+    setMode('simple');
     setStep(1);
     setDescription("");
     setToolDefinition(null);
@@ -41,13 +62,41 @@ export const ToolBuilderDialog = ({
     setLoading(false);
   };
 
+  const handleWizardComplete = async (wizardData: WizardData) => {
+    // Convert wizard data to description
+    const parts: string[] = [];
+    parts.push(`Get data from ${wizardData.selectedTables.join(', ')}`);
+    
+    if (wizardData.filters.length > 0) {
+      parts.push('where ' + wizardData.filters.map(f => 
+        `${f.table}.${f.column} ${f.operator} {${f.paramName}}`
+      ).join(' and '));
+    }
+    
+    if (wizardData.sorting) {
+      parts.push(`sorted by ${wizardData.sorting.column} ${wizardData.sorting.direction}`);
+    }
+    
+    if (wizardData.limit) {
+      parts.push(`limit ${wizardData.limit}`);
+    }
+    
+    const generatedDescription = parts.join(' ');
+    setDescription(generatedDescription);
+    
+    // Generate tool definition
+    await handleGenerateDefinition(generatedDescription);
+  };
+
   const handleClose = () => {
     handleReset();
     onOpenChange(false);
   };
 
-  const handleGenerateDefinition = async () => {
-    if (!description.trim()) {
+  const handleGenerateDefinition = async (customDescription?: string) => {
+    const desc = customDescription || description;
+    
+    if (!desc.trim()) {
       toast({
         title: "Description required",
         description: "Please describe what your tool should do",
@@ -59,20 +108,13 @@ export const ToolBuilderDialog = ({
     try {
       setLoading(true);
 
-      // Fetch schema registry first
-      const { data: schemaData, error: schemaError } = await supabase.functions.invoke(
-        "get-schema-registry"
-      );
-
-      if (schemaError) throw schemaError;
-
       // Generate tool definition WITH schema context
       const { data, error } = await supabase.functions.invoke(
         "generate-tool-definition",
         {
           body: { 
-            description,
-            schema_registry: schemaData
+            description: desc,
+            schema_registry: schemaRegistry
           },
         }
       );
@@ -96,23 +138,9 @@ export const ToolBuilderDialog = ({
     }
   };
 
-  const handleGenerateAndDeploy = async () => {
+  const handleGenerateCode = async () => {
     try {
       setLoading(true);
-      setStep(3);
-
-      // Get current user
-      const { data: { user }, error: userError } = await supabase.auth.getUser();
-      if (userError || !user) {
-        throw new Error("Not authenticated");
-      }
-
-      // Fetch schema registry for code generation
-      const { data: schemaData, error: schemaError } = await supabase.functions.invoke(
-        "get-schema-registry"
-      );
-
-      if (schemaError) throw schemaError;
 
       // Generate code WITH schema context
       const { data: codeData, error: codeError } = await supabase.functions.invoke(
@@ -120,7 +148,7 @@ export const ToolBuilderDialog = ({
         {
           body: { 
             tool_definition: toolDefinition,
-            schema_registry: schemaData
+            schema_registry: schemaRegistry
           },
         }
       );
@@ -131,6 +159,28 @@ export const ToolBuilderDialog = ({
       }
 
       setGeneratedCode(codeData.edge_function_code);
+      setStep(3); // Move to test step
+    } catch (error: any) {
+      toast({
+        title: "Code generation failed",
+        description: error.message,
+        variant: "destructive",
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleDeploy = async () => {
+    try {
+      setLoading(true);
+      setStep(4); // Deployment step
+
+      // Get current user
+      const { data: { user }, error: userError } = await supabase.auth.getUser();
+      if (userError || !user) {
+        throw new Error("Not authenticated");
+      }
 
       // Save to database
       const { error: dbError } = await supabase.from("custom_tools").insert({
@@ -144,7 +194,7 @@ export const ToolBuilderDialog = ({
         description: toolDefinition.description,
         tables_used: toolDefinition.tables_used,
         tool_schema: toolDefinition.tool_schema,
-        edge_function_code: codeData.edge_function_code,
+        edge_function_code: generatedCode,
         status: "active",
       });
 
@@ -163,7 +213,7 @@ export const ToolBuilderDialog = ({
         description: error.message,
         variant: "destructive",
       });
-      setStep(2);
+      setStep(3);
     } finally {
       setLoading(false);
     }
@@ -175,17 +225,29 @@ export const ToolBuilderDialog = ({
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Sparkles className="h-5 w-5 text-primary" />
-            Create Custom Tool - Step {step}/3
+            Create Custom Tool - Step {step}/4
           </DialogTitle>
           <DialogDescription>
-            {step === 1 && "Describe what your tool should do"}
+            {step === 1 && mode === 'simple' && "Choose how to build your tool"}
+            {step === 1 && mode === 'guided' && "Follow the guided wizard"}
             {step === 2 && "Review and confirm tool details"}
-            {step === 3 && "Generating and deploying your tool"}
+            {step === 3 && "Test your tool before deploying"}
+            {step === 4 && "Deploying your tool"}
           </DialogDescription>
         </DialogHeader>
 
-        {step === 1 && (
+        {step === 1 && mode === 'simple' && (
           <div className="space-y-4">
+            <div className="grid grid-cols-2 gap-4 mb-6">
+              <Button variant="outline" onClick={() => setMode('guided')} className="h-20 flex-col gap-2">
+                <span className="font-semibold">Guided Builder</span>
+                <span className="text-xs text-muted-foreground">Step-by-step wizard</span>
+              </Button>
+              <Button variant="outline" className="h-20 flex-col gap-2 border-primary">
+                <span className="font-semibold">Simple Mode</span>
+                <span className="text-xs text-muted-foreground">Text description</span>
+              </Button>
+            </div>
             <div className="space-y-2">
               <Label htmlFor="description">Tool Description</Label>
               <Textarea
@@ -211,12 +273,20 @@ export const ToolBuilderDialog = ({
               <Button variant="outline" onClick={handleClose}>
                 Cancel
               </Button>
-              <Button onClick={handleGenerateDefinition} disabled={loading}>
+              <Button onClick={() => handleGenerateDefinition()} disabled={loading}>
                 {loading && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
                 Next Step →
               </Button>
             </div>
           </div>
+        )}
+
+        {step === 1 && mode === 'guided' && schemaRegistry && (
+          <GuidedToolBuilder
+            schemaRegistry={schemaRegistry}
+            onComplete={handleWizardComplete}
+            onCancel={() => setMode('simple')}
+          />
         )}
 
         {step === 2 && toolDefinition && (
@@ -269,16 +339,26 @@ export const ToolBuilderDialog = ({
                 <Button variant="outline" onClick={handleClose}>
                   Cancel
                 </Button>
-                <Button onClick={handleGenerateAndDeploy} disabled={loading}>
+                <Button onClick={handleGenerateCode} disabled={loading}>
                   {loading && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
-                  Generate & Deploy →
+                  Generate Code & Test →
                 </Button>
               </div>
             </div>
           </div>
         )}
 
-        {step === 3 && (
+        {step === 3 && toolDefinition && generatedCode && (
+          <ToolTester
+            toolDefinition={toolDefinition}
+            generatedCode={generatedCode}
+            onRegenerateCode={handleGenerateCode}
+            onDeploy={handleDeploy}
+            onBack={() => setStep(2)}
+          />
+        )}
+
+        {step === 4 && (
           <div className="space-y-4 py-8">
             <div className="space-y-3">
               <div className="flex items-center gap-2 text-green-500">

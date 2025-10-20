@@ -56,7 +56,31 @@ Deno.serve(async (req) => {
 
 Based on the user's description and database schema, generate a complete tool definition for the OpenAI function calling format.
 
-Database Schema:
+⚠️ MANDATORY STEP-BY-STEP ANALYSIS:
+Before outputting the JSON, you MUST analyze in <thinking> tags:
+
+<thinking>
+1. Tables needed: [list exact table names from schema]
+2. Sample data observation: [note patterns from sample_data if available]
+3. Columns I will use from each table:
+   - table1: [column1, column2, ...]
+   - table2: [column1, column2, ...]
+4. Relationship columns detected:
+   - table1.type_id → table2.id (check column_stats for common values)
+5. Query strategy:
+   - Step 1: Query [table] to get [columns]
+   - Step 2: Use results to query [table2] with .in()
+   - Step 3: Enrich/combine results
+6. Filter logic: [describe how parameters will filter data]
+7. Verification:
+   ✓ All columns exist in available_column_names
+   ✓ All tables exist in schema
+   ✓ Multi-table strategy uses sequential queries
+</thinking>
+
+After your analysis, output the JSON tool definition.
+
+Database Schema with Sample Data:
 ${JSON.stringify(schemaData, null, 2)}
 
 ⚠️ CRITICAL DATABASE CONSTRAINTS:
@@ -135,7 +159,7 @@ Return ONLY valid JSON in this exact format:
           { role: 'system', content: systemPrompt },
           { role: 'user', content: `Generate a tool definition for: ${description}` }
         ],
-        temperature: 0.7,
+        temperature: 0.5,
       }),
     });
 

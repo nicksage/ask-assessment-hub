@@ -92,11 +92,27 @@ Deno.serve(async (req) => {
 
           console.log(`Table ${mapping.table_name} has ${count || 0} records`);
 
+          // Get sample data (2-3 rows)
+          const { data: sampleData, error: sampleError } = await supabaseClient
+            .from(mapping.table_name)
+            .select('*')
+            .eq('user_id', user.id)
+            .limit(3);
+
+          if (sampleError) {
+            console.error(`Sample data error for ${mapping.table_name}:`, sampleError);
+          }
+
+          // Get column statistics for _id columns
+          const columnStats = await getColumnStats(supabaseClient, mapping.table_name, apiColumns, user.id);
+
           return {
             table_name: mapping.table_name,
             endpoint: mapping.api_endpoints || { name: 'Unknown', method: 'GET', path: '' },
             last_synced: mapping.last_synced_at,
             record_count: count || 0,
+            sample_data: sampleData || [],
+            column_stats: columnStats,
             columns: {
               system: systemCols,
               api: apiColumns,
@@ -235,4 +251,46 @@ function detectRelationships(mappings: any[]): Relationship[] {
   });
 
   return relationships;
+}
+
+async function getColumnStats(supabaseClient: any, tableName: string, columns: any[], userId: string) {
+  const stats: Record<string, any> = {};
+  
+  // Only get stats for _id columns (potential relationships)
+  const idColumns = columns.filter((c) => c.name.endsWith('_id'));
+  
+  for (const col of idColumns) {
+    try {
+      const { data, error } = await supabaseClient
+        .from(tableName)
+        .select(col.name)
+        .eq('user_id', userId)
+        .limit(1000);
+      
+      if (error || !data) continue;
+      
+      const values = data.map((r: any) => r[col.name]).filter((v: any) => v !== null && v !== undefined);
+      const uniqueValues = [...new Set(values)];
+      const valueCounts = values.reduce((acc: any, val: any) => {
+        acc[val] = (acc[val] || 0) + 1;
+        return acc;
+      }, {});
+      
+      const sortedValues = Object.entries(valueCounts)
+        .sort(([, a]: any, [, b]: any) => b - a)
+        .slice(0, 5)
+        .map(([val]) => val);
+      
+      stats[col.name] = {
+        unique_count: uniqueValues.length,
+        most_common: sortedValues,
+        null_count: data.length - values.length,
+        total_checked: data.length
+      };
+    } catch (e) {
+      console.error(`Error getting stats for ${tableName}.${col.name}:`, e);
+    }
+  }
+  
+  return stats;
 }

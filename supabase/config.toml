@@ -27,3 +27,6 @@ verify_jwt = true
 
 [functions.manage-ai-settings]
 verify_jwt = true
+
+[functions.test-custom-tool]
+verify_jwt = true

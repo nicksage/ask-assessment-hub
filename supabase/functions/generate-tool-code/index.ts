@@ -51,14 +51,40 @@ Deno.serve(async (req) => {
       });
     }
 
+    // Check if user has OpenAI configured for better code generation
+    const { data: aiSettings } = await supabase
+      .from('ai_settings')
+      .select('provider, openai_api_key')
+      .eq('user_id', user.id)
+      .single();
+
+    const useOpenAI = aiSettings?.provider === 'openai' && aiSettings?.openai_api_key;
+
     const systemPrompt = `You are an expert at generating database query logic for Supabase.
+
+⚠️ BEFORE WRITING CODE - VERIFICATION CHECKLIST:
+
+<checklist>
+□ I have listed all columns I will use from available_column_names
+□ I verified every column name matches the schema exactly
+□ I examined sample_data to understand actual data patterns
+□ For _id columns, I checked column_stats to see common values
+□ I identified the target table for each _id column
+□ I planned the query sequence (table order matters)
+□ I will NOT use .select('other_table(*)') syntax
+□ I will use .in() for multi-table filtering
+□ I will manually enrich results, not use joins
+□ I will add console.log for debugging
+□ I will validate all input parameters
+□ I will handle errors with try-catch
+</checklist>
 
 Generate JavaScript/TypeScript code that implements this tool:
 
 Tool Details:
 ${JSON.stringify(tool_definition, null, 2)}
 
-Database Schema:
+Database Schema with Sample Data & Statistics:
 ${JSON.stringify(schemaData, null, 2)}
 
 ⚠️ CRITICAL DATABASE CONSTRAINTS:
@@ -199,19 +225,34 @@ FORBIDDEN PATTERNS (will cause errors):
 
 Return ONLY the query logic code, nothing else.`;
 
-    const response = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
+    // Use better model with lower temperature for more accurate code
+    const aiConfig = useOpenAI 
+      ? {
+          url: 'https://api.openai.com/v1/chat/completions',
+          apiKey: aiSettings.openai_api_key,
+          model: 'gpt-5-2025-08-07',
+          temperature: 0.1
+        }
+      : {
+          url: 'https://ai.gateway.lovable.dev/v1/chat/completions',
+          apiKey: LOVABLE_API_KEY,
+          model: 'google/gemini-2.5-pro',
+          temperature: 0.1
+        };
+
+    const response = await fetch(aiConfig.url, {
       method: 'POST',
       headers: {
-        'Authorization': `Bearer ${LOVABLE_API_KEY}`,
+        'Authorization': `Bearer ${aiConfig.apiKey}`,
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        model: 'google/gemini-2.5-flash',
+        model: aiConfig.model,
         messages: [
           { role: 'system', content: systemPrompt },
           { role: 'user', content: 'Generate the complete edge function code.' }
         ],
-        temperature: 0.3,
+        temperature: aiConfig.temperature,
       }),
     });
 

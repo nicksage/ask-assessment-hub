@@ -116,10 +116,11 @@ Requirements:
    - console: For logging
    - JSON: For JSON operations
 5. Use Supabase client methods ONLY (never raw SQL)
-6. Return a structured object: { success: true, count: number, data: array }
+6. MUST return a structured object: { success: true, count: number, data: array }
 7. Handle errors with try-catch and return: { success: false, error: string }
 8. Add console.log statements for debugging
 9. Validate all input parameters from args object
+10. **CRITICAL**: Your code MUST include a return statement at the end
 
 SINGLE TABLE QUERY EXAMPLE:
 try {
@@ -223,8 +224,11 @@ FORBIDDEN PATTERNS (will cause errors):
 ❌ .select('*, risk_categories!inner(*)') - No joins available
 ❌ Assuming column names exist without checking schema
 ❌ Using columns not listed in the schema
+❌ Code that doesn't return a value - MUST return { success, count, data }
 
-Return ONLY the query logic code, nothing else.`;
+**FINAL CHECK**: Does your code include a return statement with { success, count, data }?
+
+Return ONLY the query logic code, nothing else. Make sure it includes a return statement.`;
 
     // Configure AI model based on user settings
     const aiConfig = useOpenAI 

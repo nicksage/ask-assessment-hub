@@ -36,6 +36,8 @@ export const ToolBuilderDialog = ({
   const [toolDefinition, setToolDefinition] = useState<any>(null);
   const [generatedCode, setGeneratedCode] = useState("");
   const [schemaRegistry, setSchemaRegistry] = useState<any>(null);
+  const [wizardData, setWizardData] = useState<WizardData | null>(null);
+  const [preserveWizardState, setPreserveWizardState] = useState(false);
 
   useEffect(() => {
     if (open) {
@@ -62,16 +64,19 @@ export const ToolBuilderDialog = ({
     setLoading(false);
   };
 
-  const handleWizardComplete = async (wizardData: WizardData) => {
+  const handleWizardComplete = async (data: WizardData) => {
+    setWizardData(data);
+    setPreserveWizardState(true);
+    
     // Use user's description + structured config
-    const userIntent = wizardData.toolDescription;
+    const userIntent = data.toolDescription;
     
     // Build structured requirements
     const structuredParts: string[] = [];
-    structuredParts.push(`Tables: ${wizardData.selectedTables.join(', ')}`);
+    structuredParts.push(`Tables: ${data.selectedTables.join(', ')}`);
     
     // Column selection details
-    const columnDetails = Object.entries(wizardData.selectedColumns)
+    const columnDetails = Object.entries(data.selectedColumns)
       .map(([table, cols]) => 
         cols.length === 0 
           ? `${table}: *all columns*` 
@@ -82,18 +87,18 @@ export const ToolBuilderDialog = ({
       structuredParts.push(`Columns: ${columnDetails}`);
     }
     
-    if (wizardData.filters.length > 0) {
-      structuredParts.push('Filters: ' + wizardData.filters.map(f => 
+    if (data.filters.length > 0) {
+      structuredParts.push('Filters: ' + data.filters.map(f => 
         `${f.table}.${f.column} ${f.operator} {${f.paramName}}`
       ).join(', '));
     }
     
-    if (wizardData.sorting) {
-      structuredParts.push(`Sorting: ${wizardData.sorting.table}.${wizardData.sorting.column} ${wizardData.sorting.direction}`);
+    if (data.sorting) {
+      structuredParts.push(`Sorting: ${data.sorting.table}.${data.sorting.column} ${data.sorting.direction}`);
     }
     
-    if (wizardData.limit) {
-      structuredParts.push(`Limit: ${wizardData.limit} results`);
+    if (data.limit) {
+      structuredParts.push(`Limit: ${data.limit} results`);
     }
     
     // Combine user intent with structured requirements
@@ -102,10 +107,11 @@ export const ToolBuilderDialog = ({
     setDescription(userIntent); // Store user's original description for display
     
     // Generate tool definition with enhanced prompt
-    await handleGenerateDefinition(enhancedDescription, wizardData);
+    await handleGenerateDefinition(enhancedDescription, data);
   };
 
   const handleClose = () => {
+    setPreserveWizardState(false);
     handleReset();
     onOpenChange(false);
   };
@@ -303,7 +309,11 @@ export const ToolBuilderDialog = ({
           <GuidedToolBuilder
             schemaRegistry={schemaRegistry}
             onComplete={handleWizardComplete}
-            onCancel={() => setMode('simple')}
+            onCancel={() => {
+              setMode('simple');
+              setPreserveWizardState(false);
+            }}
+            initialData={preserveWizardState ? wizardData : undefined}
           />
         )}
 
@@ -350,7 +360,14 @@ export const ToolBuilderDialog = ({
             </div>
 
             <div className="flex justify-between">
-              <Button variant="outline" onClick={() => setStep(1)} disabled={loading}>
+              <Button 
+                variant="outline" 
+                onClick={() => {
+                  setStep(1);
+                  setPreserveWizardState(false);
+                }} 
+                disabled={loading}
+              >
                 ← Back
               </Button>
               <div className="flex gap-2">

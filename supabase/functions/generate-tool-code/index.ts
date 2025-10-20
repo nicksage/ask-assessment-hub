@@ -225,13 +225,12 @@ FORBIDDEN PATTERNS (will cause errors):
 
 Return ONLY the query logic code, nothing else.`;
 
-    // Use better model - Gemini doesn't support custom temperature
+    // Configure AI model - only OpenAI supports temperature parameter
     const aiConfig = useOpenAI 
       ? {
           url: 'https://api.openai.com/v1/chat/completions',
           apiKey: aiSettings.openai_api_key,
-          model: 'gpt-5-2025-08-07',
-          temperature: 0.1
+          model: 'gpt-5-2025-08-07'
         }
       : {
           url: 'https://ai.gateway.lovable.dev/v1/chat/completions',
@@ -247,9 +246,9 @@ Return ONLY the query logic code, nothing else.`;
       ]
     };
 
-    // Only add temperature for OpenAI models
+    // Add temperature only for OpenAI (Gemini doesn't support it)
     if (useOpenAI) {
-      requestBody.temperature = aiConfig.temperature;
+      requestBody.temperature = 0.1;
     }
 
     const response = await fetch(aiConfig.url, {

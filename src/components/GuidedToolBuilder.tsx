@@ -12,6 +12,7 @@ interface GuidedToolBuilderProps {
   schemaRegistry: any;
   onComplete: (wizardData: WizardData) => void;
   onCancel: () => void;
+  initialData?: WizardData | null;
 }
 
 export interface WizardData {
@@ -38,9 +39,9 @@ interface SortConfig {
   direction: 'asc' | 'desc';
 }
 
-export const GuidedToolBuilder = ({ schemaRegistry, onComplete, onCancel }: GuidedToolBuilderProps) => {
-  const [wizardStep, setWizardStep] = useState(0);
-  const [wizardData, setWizardData] = useState<WizardData>({
+export const GuidedToolBuilder = ({ schemaRegistry, onComplete, onCancel, initialData }: GuidedToolBuilderProps) => {
+  const [wizardStep, setWizardStep] = useState(initialData ? 4 : 0);
+  const [wizardData, setWizardData] = useState<WizardData>(initialData || {
     toolName: '',
     toolDescription: '',
     selectedTables: [],

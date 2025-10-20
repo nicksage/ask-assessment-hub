@@ -27,7 +27,7 @@ Deno.serve(async (req) => {
       });
     }
 
-    const { description, schema_registry } = await req.json();
+    const { description, schema_registry, wizard_data } = await req.json();
 
     if (!description) {
       return new Response(JSON.stringify({ error: 'Description is required' }), {
@@ -52,30 +52,48 @@ Deno.serve(async (req) => {
       });
     }
 
+    // Parse structured description if it contains both intent and requirements
+    let userIntent = description;
+    let structuredConfig = '';
+    
+    if (description.includes('USER INTENT:') && description.includes('STRUCTURED REQUIREMENTS:')) {
+      const parts = description.split('STRUCTURED REQUIREMENTS:');
+      userIntent = parts[0].replace('USER INTENT:', '').trim();
+      structuredConfig = parts[1].trim();
+    }
+
     const systemPrompt = `You are a tool definition generator for a data query system.
 
 Based on the user's description and database schema, generate a complete tool definition for the OpenAI function calling format.
+
+${structuredConfig ? `⚠️ IMPORTANT: The user has provided both:
+1. USER INTENT (their business goal): ${userIntent}
+2. STRUCTURED REQUIREMENTS (specific tables/columns/filters): 
+${structuredConfig}
+
+You MUST satisfy BOTH the intent and the specific structural requirements.` : ''}
 
 ⚠️ MANDATORY STEP-BY-STEP ANALYSIS:
 Before outputting the JSON, you MUST analyze in <thinking> tags:
 
 <thinking>
-1. Tables needed: [list exact table names from schema]
-2. Sample data observation: [note patterns from sample_data if available]
-3. Columns I will use from each table:
-   - table1: [column1, column2, ...]
-   - table2: [column1, column2, ...]
-4. Relationship columns detected:
+1. User's business goal: [restate the intent]
+2. Tables needed: [list exact table names from schema]
+3. Sample data observation: [note patterns from sample_data if available]
+4. Columns to use from each table:
+   ${wizard_data?.selectedColumns ? Object.entries(wizard_data.selectedColumns).map(([t, cols]: [string, any]) => `- ${t}: ${(cols as string[]).join(', ')}`).join('\n   ') : '[list from schema]'}
+5. Relationship columns detected:
    - table1.type_id → table2.id (check column_stats for common values)
-5. Query strategy:
+6. Query strategy:
    - Step 1: Query [table] to get [columns]
    - Step 2: Use results to query [table2] with .in()
    - Step 3: Enrich/combine results
-6. Filter logic: [describe how parameters will filter data]
-7. Verification:
+7. Filter logic: [describe how parameters will filter data]
+8. Verification:
    ✓ All columns exist in available_column_names
    ✓ All tables exist in schema
    ✓ Multi-table strategy uses sequential queries
+   ${wizard_data?.selectedColumns ? '✓ Only selected columns are used' : ''}
 </thinking>
 
 After your analysis, output the JSON tool definition.
@@ -157,7 +175,10 @@ Return ONLY valid JSON in this exact format:
         model: 'google/gemini-2.5-flash',
         messages: [
           { role: 'system', content: systemPrompt },
-          { role: 'user', content: `Generate a tool definition for: ${description}` }
+          { role: 'user', content: wizard_data 
+            ? `Generate a tool definition.\n\nUser Intent: ${userIntent}\n\nStructured Config: ${structuredConfig}` 
+            : `Generate a tool definition for: ${description}` 
+          }
         ],
         temperature: 0.5,
       }),

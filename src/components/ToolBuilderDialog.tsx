@@ -63,29 +63,46 @@ export const ToolBuilderDialog = ({
   };
 
   const handleWizardComplete = async (wizardData: WizardData) => {
-    // Convert wizard data to description
-    const parts: string[] = [];
-    parts.push(`Get data from ${wizardData.selectedTables.join(', ')}`);
+    // Use user's description + structured config
+    const userIntent = wizardData.toolDescription;
+    
+    // Build structured requirements
+    const structuredParts: string[] = [];
+    structuredParts.push(`Tables: ${wizardData.selectedTables.join(', ')}`);
+    
+    // Column selection details
+    const columnDetails = Object.entries(wizardData.selectedColumns)
+      .map(([table, cols]) => 
+        cols.length === 0 
+          ? `${table}: *all columns*` 
+          : `${table}: ${cols.join(', ')}`
+      )
+      .join('; ');
+    if (columnDetails) {
+      structuredParts.push(`Columns: ${columnDetails}`);
+    }
     
     if (wizardData.filters.length > 0) {
-      parts.push('where ' + wizardData.filters.map(f => 
+      structuredParts.push('Filters: ' + wizardData.filters.map(f => 
         `${f.table}.${f.column} ${f.operator} {${f.paramName}}`
-      ).join(' and '));
+      ).join(', '));
     }
     
     if (wizardData.sorting) {
-      parts.push(`sorted by ${wizardData.sorting.column} ${wizardData.sorting.direction}`);
+      structuredParts.push(`Sorting: ${wizardData.sorting.table}.${wizardData.sorting.column} ${wizardData.sorting.direction}`);
     }
     
     if (wizardData.limit) {
-      parts.push(`limit ${wizardData.limit}`);
+      structuredParts.push(`Limit: ${wizardData.limit} results`);
     }
     
-    const generatedDescription = parts.join(' ');
-    setDescription(generatedDescription);
+    // Combine user intent with structured requirements
+    const enhancedDescription = `USER INTENT: ${userIntent}\n\nSTRUCTURED REQUIREMENTS:\n${structuredParts.join('\n')}`;
     
-    // Generate tool definition
-    await handleGenerateDefinition(generatedDescription);
+    setDescription(userIntent); // Store user's original description for display
+    
+    // Generate tool definition with enhanced prompt
+    await handleGenerateDefinition(enhancedDescription, wizardData);
   };
 
   const handleClose = () => {
@@ -93,7 +110,7 @@ export const ToolBuilderDialog = ({
     onOpenChange(false);
   };
 
-  const handleGenerateDefinition = async (customDescription?: string) => {
+  const handleGenerateDefinition = async (customDescription?: string, wizardData?: WizardData) => {
     const desc = customDescription || description;
     
     if (!desc.trim()) {
@@ -108,13 +125,14 @@ export const ToolBuilderDialog = ({
     try {
       setLoading(true);
 
-      // Generate tool definition WITH schema context
+      // Generate tool definition WITH schema context and wizard data
       const { data, error } = await supabase.functions.invoke(
         "generate-tool-definition",
         {
           body: { 
             description: desc,
-            schema_registry: schemaRegistry
+            schema_registry: schemaRegistry,
+            wizard_data: wizardData // Pass structured config to AI
           },
         }
       );

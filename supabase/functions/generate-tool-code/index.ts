@@ -59,6 +59,7 @@ Deno.serve(async (req) => {
       .single();
 
     const useOpenAI = aiSettings?.provider === 'openai' && aiSettings?.openai_api_key;
+    console.log('Using AI provider:', useOpenAI ? 'OpenAI' : 'Lovable AI (Gemini)');
 
     const systemPrompt = `You are an expert at generating database query logic for Supabase.
 
@@ -225,7 +226,7 @@ FORBIDDEN PATTERNS (will cause errors):
 
 Return ONLY the query logic code, nothing else.`;
 
-    // Configure AI model - only OpenAI supports temperature parameter
+    // Configure AI model based on user settings
     const aiConfig = useOpenAI 
       ? {
           url: 'https://api.openai.com/v1/chat/completions',
@@ -235,9 +236,10 @@ Return ONLY the query logic code, nothing else.`;
       : {
           url: 'https://ai.gateway.lovable.dev/v1/chat/completions',
           apiKey: LOVABLE_API_KEY,
-          model: 'google/gemini-2.5-pro'
+          model: 'google/gemini-2.5-flash'
         };
 
+    // Build request body
     const requestBody: any = {
       model: aiConfig.model,
       messages: [
@@ -246,10 +248,12 @@ Return ONLY the query logic code, nothing else.`;
       ]
     };
 
-    // Add temperature only for OpenAI (Gemini doesn't support it)
+    // Only add temperature for OpenAI - Gemini doesn't support custom temperature
     if (useOpenAI) {
       requestBody.temperature = 0.1;
     }
+    
+    console.log('Request body config:', { model: requestBody.model, hasTemperature: 'temperature' in requestBody });
 
     const response = await fetch(aiConfig.url, {
       method: 'POST',

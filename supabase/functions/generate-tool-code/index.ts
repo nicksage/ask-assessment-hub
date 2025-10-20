@@ -248,12 +248,10 @@ Return ONLY the query logic code, nothing else.`;
       ]
     };
 
-    // Only add temperature for OpenAI - Gemini doesn't support custom temperature
-    if (useOpenAI) {
-      requestBody.temperature = 0.1;
-    }
+    // Temperature is not supported by newer models (GPT-5, Gemini 2.5)
+    // Only legacy models like gpt-4o support it
     
-    console.log('Request body config:', { model: requestBody.model, hasTemperature: 'temperature' in requestBody });
+    console.log('Request body config:', { model: requestBody.model, provider: useOpenAI ? 'OpenAI' : 'Gemini' });
 
     const response = await fetch(aiConfig.url, {
       method: 'POST',
